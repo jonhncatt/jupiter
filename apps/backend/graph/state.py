@@ -10,8 +10,10 @@ class GraphState(TypedDict, total=False):
     zeus_test_url: str
 
     raw_log: str
+    fetch_meta: Dict[str, Any]
     parsed: Dict[str, Any]
     core_plan: Dict[str, Any]
 
     tool_results: List[ToolResult]
+    final_summary: str
     draft_summary: str

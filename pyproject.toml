@@ -27,4 +27,5 @@ packages = { find = { where = ["."], include = ["apps*"] } }
 [tool.pytest.ini_options]
 testpaths = ["apps/backend/tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 pythonpath = ["."]

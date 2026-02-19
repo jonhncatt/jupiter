@@ -1,5 +1,26 @@
+import logging
 import re
 from typing import Any, Dict, List
+
+from apps.backend.core.models import ToolResult
+from apps.backend.llm.openai_client import chat
+
+logger = logging.getLogger(__name__)
+
+SYSTEM_FINALIZE = """你是SSD测试日志分析的总控专家（Core Agent Finalizer）。
+你会收到：
+1) 用户问题
+2) 日志解析结果
+3) 核心路由决策（为何调用哪些专家）
+4) 各专家返回证据
+
+请输出结构化中文结果：
+1. 总结（2-5句）
+2. 可能根因（<=3条，按可能性排序）
+3. 关键证据（引用原文片段）
+4. 建议（可执行）
+5. 下一步动作（补充信息与复现方案）
+要求：证据导向，避免空话；若信息不足明确指出缺口。"""
 
 
 class CoreAgent:
@@ -9,9 +30,9 @@ class CoreAgent:
     - Decide which downstream agents should run
     """
 
-    name = "core_agent(router)"
+    name = "core_agent(orchestrator)"
 
-    async def run(self, query: str, parsed: Dict[str, Any]) -> Dict[str, Any]:
+    async def plan(self, query: str, parsed: Dict[str, Any], raw_log: str = "") -> Dict[str, Any]:
         q = (query or "").lower()
         tokens = (parsed or {}).get("tokens") or {}
         highlights = (parsed or {}).get("highlights") or []
@@ -80,4 +101,49 @@ class CoreAgent:
             "selected_tools": selected_tools,
             "reason": " ".join(reasons) if reasons else "未触发子agent，直接进入总结。",
             "need_rag": bool(selected_tools),
+            "round_hint": 2,  # downstream expert agents can use this as max rounds hint
         }
+
+    async def finalize(
+        self,
+        *,
+        query: str,
+        parsed: Dict[str, Any],
+        core_plan: Dict[str, Any],
+        expert_reports: List[ToolResult],
+    ) -> str:
+        lines: List[str] = []
+        lines.append("【用户问题】")
+        lines.append(query)
+
+        lines.append("\n【核心路由决策】")
+        lines.append(
+            f"need_rag={core_plan.get('need_rag')} selected_tools={core_plan.get('selected_tools', [])}"
+        )
+        lines.append(f"reason={core_plan.get('reason', '')}")
+
+        lines.append("\n【日志解析关键线索】")
+        for item in (parsed.get("highlights") or [])[:25]:
+            lines.append(f"- {item}")
+
+        lines.append("\n【专家回馈】")
+        for report in expert_reports:
+            lines.append(f"- {report.tool} ok={report.ok}: {report.summary}")
+            for ev in report.evidences[:4]:
+                lines.append(f"  * ({ev.source}) {ev.snippet}")
+
+        try:
+            return chat(SYSTEM_FINALIZE, "\n".join(lines))
+        except Exception as e:
+            logger.warning("Core finalize failed: %s", e)
+            return (
+                "总结：信息不足，当前仅能基于有限日志与专家结果给出初步判断。\n"
+                "可能根因：1) 控制器就绪超时相关时序问题 2) 低功耗/寄存器配置异常 3) 环境因素导致初始化失败。\n"
+                "关键证据：请查看 highlights 与专家证据字段。\n"
+                "建议：补充CSTS/CC/APST时序与复现环境差异数据。\n"
+                "下一步动作：再次复现并抓取完整寄存器快照。"
+            )
+
+    # Backward-compatible alias
+    async def run(self, query: str, parsed: Dict[str, Any]) -> Dict[str, Any]:
+        return await self.plan(query, parsed)

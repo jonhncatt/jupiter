@@ -7,6 +7,7 @@ from apps.backend.tools.zeus_portal import ZeusPortalClient
 from apps.backend.tools.dify_client import DifyClient
 from apps.backend.services.log_fetcher import LogFetcher
 from apps.backend.services.log_parser import LogParser
+from apps.backend.agents.fetch_agent import FetchAgent
 from apps.backend.agents.core_agent import CoreAgent
 from apps.backend.agents.spec_agent import SpecAgent
 from apps.backend.agents.tp_agent import TpAgent
@@ -28,7 +29,7 @@ async def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
 
     # services
     zeus = ZeusPortalClient()
-    fetcher = LogFetcher(zeus)
+    fetch_agent = FetchAgent(LogFetcher(zeus))
     parser = LogParser()
 
     # dify agents
@@ -40,10 +41,10 @@ async def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
     jira_agent = JiraAgent()
     core_agent = CoreAgent()
 
-    node_fetch, node_parse, node_core, node_tools, node_summarize = make_nodes(
-        fetcher, parser, core_agent, spec_agent, tp_agent, jira_agent
+    node_fetch, node_parse, node_core_plan, node_experts, node_finalize = make_nodes(
+        fetch_agent, parser, core_agent, spec_agent, tp_agent, jira_agent
     )
-    graph = build(node_fetch, node_parse, node_core, node_tools, node_summarize)
+    graph = build(node_fetch, node_parse, node_core_plan, node_experts, node_finalize)
 
     init = {
         "request_id": req.request_id,
@@ -60,7 +61,7 @@ async def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
     for tr in tool_results:
         evidences.extend(tr.evidences[:2])
 
-    summary_text = (out.get("draft_summary") or "").strip() or "（无总结）"
+    summary_text = (out.get("final_summary") or out.get("draft_summary") or "").strip() or "（无总结）"
 
     resp = AnalyzeResponse(
         request_id=req.request_id,
