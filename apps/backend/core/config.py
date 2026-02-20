@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     dify_mode: str = Field(default="chat", alias="DIFY_MODE")  # chat | workflow
     dify_spec_app_key: str = Field(default="", alias="DIFY_SPEC_APP_KEY")
     dify_tp_app_key: str = Field(default="", alias="DIFY_TP_APP_KEY")
+    dify_jira_app_key: str = Field(default="", alias="DIFY_JIRA_APP_KEY")
 
     # Cache
     cache_ttl_seconds: int = Field(default=600, alias="CACHE_TTL_SECONDS")

@@ -35,10 +35,11 @@ async def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
     # dify agents
     spec_client = DifyClient(settings.dify_spec_app_key)
     tp_client = DifyClient(settings.dify_tp_app_key)
+    jira_client = DifyClient(settings.dify_jira_app_key)
 
     spec_agent = SpecAgent(spec_client)
     tp_agent = TpAgent(tp_client)
-    jira_agent = JiraAgent()
+    jira_agent = JiraAgent(jira_client)
     core_agent = CoreAgent()
 
     node_fetch, node_parse, node_core_plan, node_experts, node_finalize = make_nodes(
