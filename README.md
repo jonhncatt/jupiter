@@ -1,40 +1,208 @@
-# Jupiter (Zeus log + Dify RAG)
+# Jupiter（Zeus 日志 + Dify RAG + CoreAgent 编排）
 
-## 1) Quickstart
-1. cp .env.example .env
-2. Fill:
-   - ZEUS_TEST_URL_TEMPLATE
-   - ZEUS_COOKIE (copy from browser)
-   - DIFY_BASE_URL + DIFY_SPEC_APP_KEY + DIFY_TP_APP_KEY + DIFY_JIRA_APP_KEY
-   - OPENAI_API_KEY / BASE_URL / MODEL
-   - OFFICETOOL_CA_CERT_PATH (如果公司内网 TLS 需要根证书)
+Jupiter 是一个面向 SSD/NVMe 测试分析的后端系统：  
+输入 `matrix_id/test_id + 用户问题`，自动获取 Zeus 日志、解析关键信号、按需调用 Dify 知识库（Spec/TP/Jira），最后输出结构化结论。
 
-3. Run:
-   docker-compose up --build
+---
 
-4. Open:
-- Backend Swagger: http://localhost:8000/docs
-- Streamlit: http://localhost:8502
+## 1. 项目目标
 
-## 2) Corporate CA (important for internal TLS)
-- Set `OFFICETOOL_CA_CERT_PATH=/absolute/path/to/CompanyInternalRootCA.cer`
-- Backend will apply this CA for:
-  - OpenAI-compatible LLM calls
-  - Dify API calls
-  - Zeus HTTPS downloads
-- If you run with Docker, ensure cert file path is visible inside container (mount it and use container path in `.env`).
+- 统一分析入口：日志、规范、代码、缺陷信息在同一条流程里汇总。
+- 面向真实内网：支持公司 TLS 根证书、Zeus Cookie 认证、OpenAI-compatible 接入。
+- 失败可降级：Zeus/Dify/LLM 任一异常不崩溃，仍返回可读结果。
 
-## 3) How to get ZEUS_COOKIE
-- Open Zeus test page in browser (already logged in)
-- DevTools -> Network -> any request -> Request Headers -> copy the whole `Cookie:` value
-- Paste into `.env` as ZEUS_COOKIE=...
+---
 
-If Zeus portal doesn't allow direct `{test_url}/logsarchive.zip`, edit:
-`apps/backend/tools/zeus_portal.py -> resolve_zip_url()`
+## 2. 架构概览
 
-## 4) Runtime flow (CoreAgent orchestration)
-1. `FetchAgent` 下载日志（Zeus zip）并兜底 mock。
-2. `LogParser` 把 raw log 结构化为 `errors/warnings/highlights/tokens`。
-3. `CoreAgent.plan` 决定是否调用下属专家（`spec/tp/jira`）以及轮次建议。
-4. 专家 agent 按计划并行执行，并各自调用 Dify RAG（支持多轮重试）。
-5. `CoreAgent.finalize` 汇总：解析线索 + 专家证据 -> 最终中文报告。
+```mermaid
+flowchart LR
+UI["Streamlit"] --> API["FastAPI /api/analyze"]
+API --> G["LangGraph Workflow"]
+
+G --> F["FetchAgent"]
+F --> Z["ZeusPortalClient"]
+G --> P["LogParser"]
+
+G --> C1["CoreAgent.plan"]
+C1 --> S["SpecAgent (Dify App)"]
+C1 --> T["TpAgent (Dify App)"]
+C1 --> J["JiraAgent (Dify App)"]
+
+S --> D["Dify /v1/chat-messages"]
+T --> D
+J --> D
+
+G --> C2["CoreAgent.finalize"]
+C2 --> L["OpenAI-compatible LLM"]
+L --> R["AnalyzeResponse"]
+R --> UI
+```
+
+---
+
+## 3. 目录结构（关键部分）
+
+```text
+jupiter/
+  apps/
+    backend/
+      api/routes.py
+      graph/nodes.py
+      agents/
+        core_agent.py
+        fetch_agent.py
+        spec_agent.py
+        tp_agent.py
+        jira_agent.py
+      tools/
+        zeus_portal.py
+        dify_client.py
+      services/
+        log_fetcher.py
+        log_parser.py
+      core/
+        config.py
+        tls.py
+    frontend/
+      streamlit_app.py
+```
+
+---
+
+## 4. 快速启动（Docker）
+
+1. 准备环境变量
+
+```bash
+cp .env.example .env
+```
+
+2. 填写 `.env` 关键项（至少）
+
+- `ZEUS_TEST_URL_TEMPLATE`
+- `ZEUS_COOKIE`
+- `DIFY_BASE_URL`
+- `DIFY_SPEC_APP_KEY`
+- `DIFY_TP_APP_KEY`
+- `DIFY_JIRA_APP_KEY`
+- `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `OPENAI_MODEL`
+- `OFFICETOOL_CA_CERT_PATH`（内网 TLS 需要时）
+
+3. 启动
+
+```bash
+docker compose up --build
+```
+
+4. 访问
+
+- Backend Swagger: `http://localhost:8000/docs`
+- Streamlit: `http://localhost:8502`
+
+---
+
+## 5. 环境变量说明
+
+| 变量 | 说明 | 示例 |
+|---|---|---|
+| `ZEUS_TEST_URL_TEMPLATE` | Zeus 测试页面模板（用 matrix/test 拼接） | `https://zeus.example.com/test/{matrix_id}/{test_id}` |
+| `ZEUS_LOG_ZIP_NAME` | 日志压缩包名 | `logsarchive.zip` |
+| `ZEUS_COOKIE` | 从浏览器复制的完整 Cookie 值 | `session=...; token=...` |
+| `ZEUS_EXTRA_HEADERS_JSON` | 额外请求头（JSON） | `{"X-Token":"abc"}` |
+| `DIFY_BASE_URL` | Dify 服务地址（可不带 `/v1`） | `http://10.22.57.219:28882` |
+| `DIFY_SPEC_APP_KEY` | Spec 知识库 App Key | `app-...` |
+| `DIFY_TP_APP_KEY` | TP/代码知识库 App Key | `app-...` |
+| `DIFY_JIRA_APP_KEY` | Jira 知识库 App Key | `app-...` |
+| `OPENAI_API_KEY` | 总结 LLM 的 API Key | `sk-...` |
+| `OPENAI_BASE_URL` | OpenAI-compatible 基地址 | `https://api.openai.com/v1` |
+| `OPENAI_MODEL` | 总结模型 | `gpt-4o-mini` |
+| `OFFICETOOL_CA_CERT_PATH` | 内网根证书路径（非常重要） | `/certs/CompanyInternalRootCA.cer` |
+| `CACHE_TTL_SECONDS` | 请求缓存秒数 | `600` |
+
+---
+
+## 6. 公司内网证书（TLS）
+
+如果你们网络要求自有根证书，请设置：
+
+```env
+OFFICETOOL_CA_CERT_PATH=/absolute/path/to/CompanyInternalRootCA.cer
+```
+
+Jupiter 会将该证书应用到以下请求：
+
+- OpenAI-compatible LLM
+- Dify API
+- Zeus HTTPS 下载
+
+### Docker 场景注意
+
+证书路径必须是**容器内路径**。  
+例如把宿主机证书挂载到容器 `/certs`，并在 `.env` 里填 `/certs/CompanyInternalRootCA.cer`。
+
+---
+
+## 7. Zeus Cookie 获取方式
+
+1. 浏览器登录 Zeus 测试页面。  
+2. 打开 DevTools -> Network。  
+3. 选任一请求，复制 `Request Headers` 中 `Cookie` 的完整值。  
+4. 写入 `.env`：
+
+```env
+ZEUS_COOKIE=...
+```
+
+如你的 Zeus 不是 `test_url/logsarchive.zip` 直连模式，可修改：  
+`apps/backend/tools/zeus_portal.py` 的 `resolve_zip_url()`。
+
+---
+
+## 8. 运行流程（一次请求）
+
+1. `FetchAgent` 下载并合并日志文本（失败时自动使用 mock log）。  
+2. `LogParser` 产出 `errors/warnings/highlights/tokens`。  
+3. `CoreAgent.plan` 决定调用哪些专家（Spec/TP/Jira）与检索轮次提示。  
+4. 专家并行调用各自 Dify App，返回证据片段。  
+5. `CoreAgent.finalize` 汇总日志线索 + 专家证据，生成最终中文报告。  
+6. API 返回 `AnalyzeResponse`（摘要、根因、证据、建议、下一步）。  
+
+---
+
+## 9. API 示例
+
+```bash
+curl -X POST http://localhost:8000/api/analyze \
+  -H "Content-Type: application/json" \
+  -d '{
+    "request_id": "req-001",
+    "user_query": "这个 timeout waiting for controller ready 可能根因是什么？",
+    "matrix_id": "123",
+    "test_id": "456"
+  }'
+```
+
+---
+
+## 10. 测试与开发
+
+```bash
+pytest -q
+```
+
+当前最小保障：
+
+- URL 拼接与 zip 处理测试
+- Dify 兼容字段解析测试
+- Graph happy path 测试
+- CoreAgent 路由与 finalize 测试
+
+---
+
+## 11. 安全建议
+
+- 不要把真实 `app key`、`cookie`、内部地址提交到仓库。  
+- 若密钥曾在截图/聊天中暴露，请立即轮换。  
+- `.env` 仅用于本地或内网环境，生产请用密钥管理系统。  
+
