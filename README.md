@@ -17,7 +17,7 @@
 - Streamlit: http://localhost:8502
 
 ## 2) Corporate CA (important for internal TLS)
-- Set `OFFICETOOL_CA_CERT_PATH=/absolute/path/to/KIOXIAInternalRootCA.cer`
+- Set `OFFICETOOL_CA_CERT_PATH=/absolute/path/to/CompanyInternalRootCA.cer`
 - Backend will apply this CA for:
   - OpenAI-compatible LLM calls
   - Dify API calls
