@@ -102,7 +102,43 @@ docker compose up --build
 
 ---
 
-## 5. 环境变量说明
+## 5. 本地运行（非 Docker）
+
+1. 安装依赖
+
+```bash
+cd /Users/dalizhou/openaicdx/jupiter
+python -m pip install -e .
+```
+
+2. 准备环境变量
+
+```bash
+cp .env.example .env
+```
+
+按需填写 `.env`（与 Docker 相同，尤其是 `DIFY_*`、`ZEUS_*`、`OPENAI_*`、`OFFICETOOL_CA_CERT_PATH`）。
+
+3. 启动后端
+
+```bash
+uvicorn apps.backend.main:app --host 0.0.0.0 --port 8000
+```
+
+4. 启动前端（新开一个终端）
+
+```bash
+streamlit run apps/frontend/streamlit_app.py --server.port 8502
+```
+
+5. 访问地址
+
+- Backend Swagger: `http://localhost:8000/docs`
+- Streamlit: `http://localhost:8502`
+
+---
+
+## 6. 环境变量说明
 
 | 变量 | 说明 | 示例 |
 |---|---|---|
@@ -122,7 +158,7 @@ docker compose up --build
 
 ---
 
-## 6. 公司内网证书（TLS）
+## 7. 公司内网证书（TLS）
 
 如果你们网络要求自有根证书，请设置：
 
@@ -143,7 +179,7 @@ Jupiter 会将该证书应用到以下请求：
 
 ---
 
-## 7. Zeus Cookie 获取方式
+## 8. Zeus Cookie 获取方式
 
 1. 浏览器登录 Zeus 测试页面。  
 2. 打开 DevTools -> Network。  
@@ -159,7 +195,7 @@ ZEUS_COOKIE=...
 
 ---
 
-## 8. 运行流程（一次请求）
+## 9. 运行流程（一次请求）
 
 1. `FetchAgent` 下载并合并日志文本（失败时自动使用 mock log）。  
 2. `LogParser` 产出 `errors/warnings/highlights/tokens`。  
@@ -170,7 +206,7 @@ ZEUS_COOKIE=...
 
 ---
 
-## 9. API 示例
+## 10. API 示例
 
 ```bash
 curl -X POST http://localhost:8000/api/analyze \
@@ -185,7 +221,7 @@ curl -X POST http://localhost:8000/api/analyze \
 
 ---
 
-## 10. 测试与开发
+## 11. 测试与开发
 
 ```bash
 pytest -q
@@ -200,9 +236,8 @@ pytest -q
 
 ---
 
-## 11. 安全建议
+## 12. 安全建议
 
 - 不要把真实 `app key`、`cookie`、内部地址提交到仓库。  
 - 若密钥曾在截图/聊天中暴露，请立即轮换。  
 - `.env` 仅用于本地或内网环境，生产请用密钥管理系统。  
-
