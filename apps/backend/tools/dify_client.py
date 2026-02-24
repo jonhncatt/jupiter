@@ -3,6 +3,7 @@ import httpx
 from typing import Dict, Any, Optional
 from apps.backend.core.config import settings
 from apps.backend.core.errors import DifyError
+from apps.backend.core.tls import tls_verify
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ class DifyClient:
             payload["conversation_id"] = conversation_id
 
         try:
-            async with httpx.AsyncClient(timeout=60) as client:
+            async with httpx.AsyncClient(timeout=60, verify=tls_verify()) as client:
                 r = await client.post(url, headers=headers, json=payload)
                 r.raise_for_status()
                 return r.json()

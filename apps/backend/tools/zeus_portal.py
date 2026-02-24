@@ -4,6 +4,7 @@ import httpx
 from typing import Dict
 from apps.backend.core.config import settings
 from apps.backend.core.errors import ConfigError, ZeusDownloadError
+from apps.backend.core.tls import tls_verify
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ class ZeusPortalClient:
 
         logger.info("Downloading Zeus zip: %s", zip_url)
         try:
-            async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
+            async with httpx.AsyncClient(timeout=60, follow_redirects=True, verify=tls_verify()) as client:
                 r = await client.get(zip_url, headers=headers)
                 if r.status_code in (401, 403):
                     raise ZeusDownloadError(

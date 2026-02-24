@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     openai_api_key: str = Field(default="CHANGE_ME", alias="OPENAI_API_KEY")
     openai_base_url: str = Field(default="https://api.openai.com/v1", alias="OPENAI_BASE_URL")
     openai_model: str = Field(default="gpt-4o-mini", alias="OPENAI_MODEL")
+    officetool_ca_cert_path: str = Field(default="", alias="OFFICETOOL_CA_CERT_PATH")
+    offciatool_ca_cert_path: str = Field(default="", alias="OFFCIATOOL_CA_CERT_PATH")
 
     # Zeus portal downloading
     zeus_test_url_template: str = Field(
