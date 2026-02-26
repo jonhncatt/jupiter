@@ -5,12 +5,10 @@ ARG PIP_EXTRA_INDEX_URL=""
 ARG PIP_TRUSTED_HOST=""
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
 COPY certs /tmp/certs
 RUN if [ -n "$COMPANY_CA_CERT_FILENAME" ] && [ -f "/tmp/certs/$COMPANY_CA_CERT_FILENAME" ]; then \
       cp "/tmp/certs/$COMPANY_CA_CERT_FILENAME" /usr/local/share/ca-certificates/company-root-ca.crt; \
-      update-ca-certificates; \
+      if command -v update-ca-certificates >/dev/null 2>&1; then update-ca-certificates; fi; \
     fi
 
 RUN if [ -n "$PIP_INDEX_URL" ]; then pip config set global.index-url "$PIP_INDEX_URL"; fi \
