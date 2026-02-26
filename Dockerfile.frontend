@@ -1,5 +1,22 @@
 FROM python:3.11-slim
+ARG COMPANY_CA_CERT_FILENAME=""
+ARG PIP_INDEX_URL=""
+ARG PIP_EXTRA_INDEX_URL=""
+ARG PIP_TRUSTED_HOST=""
 WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+COPY certs /tmp/certs
+RUN if [ -n "$COMPANY_CA_CERT_FILENAME" ] && [ -f "/tmp/certs/$COMPANY_CA_CERT_FILENAME" ]; then \
+      cp "/tmp/certs/$COMPANY_CA_CERT_FILENAME" /usr/local/share/ca-certificates/company-root-ca.crt; \
+      update-ca-certificates; \
+    fi
+
+RUN if [ -n "$PIP_INDEX_URL" ]; then pip config set global.index-url "$PIP_INDEX_URL"; fi \
+    && if [ -n "$PIP_EXTRA_INDEX_URL" ]; then pip config set global.extra-index-url "$PIP_EXTRA_INDEX_URL"; fi \
+    && if [ -n "$PIP_TRUSTED_HOST" ]; then pip config set global.trusted-host "$PIP_TRUSTED_HOST"; fi
+
 COPY pyproject.toml /app/pyproject.toml
 RUN pip install --no-cache-dir -U pip && pip install --no-cache-dir -e .
 COPY apps /app/apps

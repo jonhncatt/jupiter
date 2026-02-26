@@ -3,6 +3,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
+      args:
+        - COMPANY_CA_CERT_FILENAME=${COMPANY_CA_CERT_FILENAME:-}
+        - PIP_INDEX_URL=${PIP_INDEX_URL:-}
+        - PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL:-}
+        - PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST:-}
     env_file: .env
     ports:
       - "8000:8000"
@@ -11,6 +16,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+      args:
+        - COMPANY_CA_CERT_FILENAME=${COMPANY_CA_CERT_FILENAME:-}
+        - PIP_INDEX_URL=${PIP_INDEX_URL:-}
+        - PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL:-}
+        - PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST:-}
     environment:
       - JUPITER_BACKEND=http://backend:8000
     ports:

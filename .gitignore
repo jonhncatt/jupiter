@@ -10,4 +10,7 @@ __pycache__/
 tmp/
 output/
 
+certs/*
+!certs/.gitkeep
+
 .DS_Store

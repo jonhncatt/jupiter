@@ -88,6 +88,7 @@ cp .env.example .env
 - `DIFY_JIRA_APP_KEY`
 - `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `OPENAI_MODEL`
 - `OFFICETOOL_CA_CERT_PATH`（内网 TLS 需要时）
+- `COMPANY_CA_CERT_FILENAME`（公司 Docker 构建需要私有根证书时）
 
 3. 启动
 
@@ -99,6 +100,31 @@ docker compose up --build
 
 - Backend Swagger: `http://localhost:8000/docs`
 - Streamlit: `http://localhost:8502`
+
+### 4.1 公司内网 Docker 构建（解决 `CERTIFICATE_VERIFY_FAILED`）
+
+如果在 `docker compose up --build` 期间看到 `pip install ... CERTIFICATE_VERIFY_FAILED`：
+
+1. 把公司根证书放入仓库目录 `certs/`（例如 `certs/CompanyInternalRootCA.cer`）。
+2. 在 `.env` 设置：
+
+```env
+COMPANY_CA_CERT_FILENAME=CompanyInternalRootCA.cer
+```
+
+3. 如公司要求内网 PyPI，再补充：
+
+```env
+PIP_INDEX_URL=https://<your-internal-pypi>/simple
+PIP_TRUSTED_HOST=<your-internal-pypi-host>
+```
+
+4. 重新构建：
+
+```bash
+docker compose build --no-cache
+docker compose up -d
+```
 
 ---
 
@@ -154,6 +180,10 @@ streamlit run apps/frontend/streamlit_app.py --server.port 8502
 | `OPENAI_BASE_URL` | OpenAI-compatible 基地址 | `https://api.openai.com/v1` |
 | `OPENAI_MODEL` | 总结模型 | `gpt-4o-mini` |
 | `OFFICETOOL_CA_CERT_PATH` | 内网根证书路径（非常重要） | `/certs/CompanyInternalRootCA.cer` |
+| `COMPANY_CA_CERT_FILENAME` | Docker 构建时注入到镜像信任链的证书文件名（位于 `certs/`） | `CompanyInternalRootCA.cer` |
+| `PIP_INDEX_URL` | Docker 构建使用的 Python 包源（内网环境可指向私有镜像） | `https://pypi.example.com/simple` |
+| `PIP_EXTRA_INDEX_URL` | 额外 Python 包源 | `https://extra.example.com/simple` |
+| `PIP_TRUSTED_HOST` | pip 信任主机（证书策略严格时使用） | `pypi.example.com` |
 | `CACHE_TTL_SECONDS` | 请求缓存秒数 | `600` |
 
 ---
@@ -174,8 +204,13 @@ Jupiter 会将该证书应用到以下请求：
 
 ### Docker 场景注意
 
-证书路径必须是**容器内路径**。  
-例如把宿主机证书挂载到容器 `/certs`，并在 `.env` 里填 `/certs/CompanyInternalRootCA.cer`。
+镜像构建与运行是两条链路：
+
+- 构建阶段（`pip install`）证书：使用 `certs/` + `COMPANY_CA_CERT_FILENAME`。
+- 运行阶段（OpenAI/Dify/Zeus 请求）证书：使用 `OFFICETOOL_CA_CERT_PATH`。
+
+如果你把证书直接放到镜像内（通过 `COMPANY_CA_CERT_FILENAME`），通常运行阶段可不再单独设置；  
+若仍需显式指定，保证 `OFFICETOOL_CA_CERT_PATH` 指向容器内存在的证书路径。
 
 ---
 
