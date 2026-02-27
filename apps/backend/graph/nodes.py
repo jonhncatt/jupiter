@@ -207,8 +207,10 @@ def make_nodes(
                 "files_count": fetched.get("fetch_meta", {}).get("files_count", 0),
                 "test_url": fetched.get("fetch_meta", {}).get("test_url"),
                 "zip_url": fetched.get("fetch_meta", {}).get("zip_url"),
+                "downloaded_zip_path": fetched.get("fetch_meta", {}).get("downloaded_zip_path"),
                 "status_code": fetched.get("fetch_meta", {}).get("status_code"),
                 "final_url": fetched.get("fetch_meta", {}).get("final_url"),
+                "extract_status": fetched.get("fetch_meta", {}).get("extract_status"),
                 "top_files": fetched.get("fetch_meta", {}).get("top_files", []),
             },
         )

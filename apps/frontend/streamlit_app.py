@@ -86,12 +86,20 @@ def render_result(data: Dict[str, Any]) -> None:
             st.write(f"- test_url: {fetch_meta.get('test_url')}")
         if fetch_meta.get("zip_url"):
             st.write(f"- zip_url: {fetch_meta.get('zip_url')}")
+        if fetch_meta.get("downloaded_zip_path"):
+            st.write(f"- downloaded_zip_path: {fetch_meta.get('downloaded_zip_path')}")
         if fetch_meta.get("status_code") is not None:
             st.write(f"- status_code: {fetch_meta.get('status_code')}")
         if fetch_meta.get("final_url"):
             st.write(f"- final_url: {fetch_meta.get('final_url')}")
         if fetch_meta.get("has_cookie_header") is not None:
             st.write(f"- has_cookie_header: {fetch_meta.get('has_cookie_header')}")
+        if fetch_meta.get("extract_status"):
+            st.write(f"- extract_status: {fetch_meta.get('extract_status')}")
+        if fetch_meta.get("zip_member_count") is not None:
+            st.write(f"- zip_member_count: {fetch_meta.get('zip_member_count')}")
+        if fetch_meta.get("zip_members_preview"):
+            st.write(f"- zip_members_preview: {fetch_meta.get('zip_members_preview')}")
         if fetch_meta.get("top_files"):
             st.write(f"- top_files: {fetch_meta.get('top_files')}")
         if show_debug_detail:

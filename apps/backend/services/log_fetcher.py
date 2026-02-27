@@ -1,11 +1,13 @@
 import logging
 import os
+import tempfile
+import uuid
 from typing import Optional
 
 from apps.backend.core.errors import LogFetchError
 from apps.backend.tools.zeus_portal import ZeusPortalClient, build_test_url
 from apps.backend.core.config import settings
-from apps.backend.services.zip_utils import extract_text_files, merge_texts
+from apps.backend.services.zip_utils import extract_text_files, list_zip_members, merge_texts
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +61,7 @@ class LogFetcher:
                 meta["source"] = "local_zip"
                 zip_bytes, local_meta = _read_local_zip_bytes_detail(test_url)
                 meta.update(local_meta)
+                meta["downloaded_zip_path"] = local_meta.get("selected_zip_path", "")
                 meta["steps"].append(
                     {
                         "step": "fetch.local_zip",
@@ -71,6 +74,7 @@ class LogFetcher:
                 zeus_detail = await self.zeus.download_logs_zip_detail(test_url=test_url)
                 zip_bytes = zeus_detail["zip_bytes"]
                 meta.update(zeus_detail.get("meta", {}))
+                meta["downloaded_zip_path"] = _save_debug_zip(zip_bytes)
                 meta["steps"].append(
                     {
                         "step": "fetch.zeus_http",
@@ -80,20 +84,33 @@ class LogFetcher:
                         "content_type": meta.get("content_type"),
                         "content_length": meta.get("content_length"),
                         "has_cookie_header": meta.get("has_cookie_header"),
+                        "downloaded_zip_path": meta.get("downloaded_zip_path"),
                     }
                 )
+            members = list_zip_members(zip_bytes)
+            meta["zip_member_count"] = len(members)
+            meta["zip_members_preview"] = members[:20]
             files = extract_text_files(zip_bytes)
             if not files:
                 reason = "zip_has_no_text_files"
                 logger.warning("zip extracted no text files")
                 meta.update({"reason": reason, "files_count": 0})
-                meta["steps"].append({"step": "zip.extract", "status": "empty", "reason": reason})
+                meta["extract_status"] = "empty"
+                meta["steps"].append(
+                    {
+                        "step": "zip.extract",
+                        "status": "empty",
+                        "reason": reason,
+                        "zip_member_count": meta.get("zip_member_count", 0),
+                    }
+                )
                 raise LogFetchError(f"Fetched zip but no supported text logs were found from source: {test_url}")
             meta.update(
                 {
                     "reason": "ok",
                     "files_count": len(files),
                     "top_files": [name for name, _ in files[:5]],
+                    "extract_status": "ok",
                 }
             )
             meta["steps"].append(
@@ -102,6 +119,7 @@ class LogFetcher:
                     "status": "ok",
                     "files_count": len(files),
                     "top_files": [name for name, _ in files[:5]],
+                    "zip_member_count": meta.get("zip_member_count", 0),
                 }
             )
             return {"raw_log": merge_texts(files), "meta": meta}
@@ -111,6 +129,7 @@ class LogFetcher:
             reason = f"fetch_failed:{e}"
             logger.warning("fetch_raw_log failed: %s", e)
             meta.update({"reason": reason})
+            meta.setdefault("extract_status", "error")
             meta["steps"].append({"step": "fetch.failed", "reason": reason})
             raise LogFetchError(f"Fetch failed for source `{test_url}`: {e}") from e
 
@@ -194,3 +213,11 @@ def _read_local_zip_bytes_detail(path_or_url: str) -> tuple[bytes, dict]:
 
     raise FileNotFoundError(f"Local path not found: {path}")
 
+
+def _save_debug_zip(zip_bytes: bytes) -> str:
+    base_dir = os.path.join(tempfile.gettempdir(), "jupiter_fetch")
+    os.makedirs(base_dir, exist_ok=True)
+    path = os.path.join(base_dir, f"{uuid.uuid4().hex}.zip")
+    with open(path, "wb") as f:
+        f.write(zip_bytes)
+    return path

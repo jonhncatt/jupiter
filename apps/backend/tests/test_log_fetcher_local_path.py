@@ -32,6 +32,17 @@ async def test_fetch_raw_log_from_local_directory(tmp_path, monkeypatch):
     )
     assert "timeout waiting for controller ready" in raw
 
+    detail = await fetcher.fetch_raw_log_detail(
+        sku=None,
+        matrix_id=None,
+        test_id=None,
+        zeus_test_url=str(tmp_path),
+    )
+    meta = detail["meta"]
+    assert meta["downloaded_zip_path"].endswith("logsarchive.zip")
+    assert meta["extract_status"] == "ok"
+    assert meta["zip_member_count"] >= 1
+
 
 async def test_fetch_raw_log_from_invalid_explicit_path_raises(tmp_path):
     fetcher = LogFetcher(ZeusPortalClient())
