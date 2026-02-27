@@ -16,7 +16,12 @@ RUN if [ -n "$PIP_INDEX_URL" ]; then pip config set global.index-url "$PIP_INDEX
     && if [ -n "$PIP_TRUSTED_HOST" ]; then pip config set global.trusted-host "$PIP_TRUSTED_HOST"; fi
 
 COPY pyproject.toml /app/pyproject.toml
-RUN pip install --no-cache-dir -U pip && pip install --no-cache-dir -e .
+RUN if [ -n "$COMPANY_CA_CERT_FILENAME" ] && [ -f "/tmp/certs/$COMPANY_CA_CERT_FILENAME" ]; then \
+      export PIP_CERT="/tmp/certs/$COMPANY_CA_CERT_FILENAME"; \
+      export SSL_CERT_FILE="/tmp/certs/$COMPANY_CA_CERT_FILENAME"; \
+      export REQUESTS_CA_BUNDLE="/tmp/certs/$COMPANY_CA_CERT_FILENAME"; \
+    fi; \
+    pip install --no-cache-dir -U pip && pip install --no-cache-dir -e .
 COPY apps /app/apps
 EXPOSE 8501
 CMD ["streamlit", "run", "apps/frontend/streamlit_app.py", "--server.address=0.0.0.0", "--server.port=8501"]
