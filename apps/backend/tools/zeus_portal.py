@@ -2,7 +2,7 @@ import json
 import logging
 import string
 import httpx
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 from apps.backend.core.config import settings
 from apps.backend.core.errors import ConfigError, ZeusDownloadError
 from apps.backend.core.tls import tls_verify
@@ -68,24 +68,44 @@ class ZeusPortalClient:
         # 默认：test_url 后面直接拼 zip 名
         return test_url.rstrip("/") + "/" + settings.zeus_log_zip_name
 
-    async def download_logs_zip(self, *, test_url: str) -> bytes:
+    async def download_logs_zip_detail(self, *, test_url: str) -> Dict[str, Any]:
         zip_url = self.resolve_zip_url(test_url)
         headers = _headers()
+        meta: Dict[str, Any] = {
+            "test_url": test_url,
+            "zip_url": zip_url,
+            "has_cookie_header": "Cookie" in headers,
+        }
 
         logger.info("Downloading Zeus zip: %s", zip_url)
         try:
             async with httpx.AsyncClient(timeout=60, follow_redirects=True, verify=tls_verify()) as client:
                 r = await client.get(zip_url, headers=headers)
+                meta.update(
+                    {
+                        "status_code": r.status_code,
+                        "final_url": str(r.url),
+                        "content_type": r.headers.get("Content-Type", ""),
+                        "content_length": len(r.content),
+                    }
+                )
                 if r.status_code in (401, 403):
                     raise ZeusDownloadError(
                         "Zeus download unauthorized. Please set ZEUS_COOKIE (copy from browser) or headers."
                     )
                 r.raise_for_status()
-                # basic sanity
                 if len(r.content) < 1024:
                     logger.warning("zip content too small, may be HTML error page")
-                return r.content
+                return {
+                    "zip_bytes": r.content,
+                    "meta": meta,
+                }
         except ZeusDownloadError:
             raise
         except Exception as e:
+            meta.update({"error": str(e)})
             raise ZeusDownloadError(f"Failed to download logsarchive.zip: {e}") from e
+
+    async def download_logs_zip(self, *, test_url: str) -> bytes:
+        detail = await self.download_logs_zip_detail(test_url=test_url)
+        return detail["zip_bytes"]

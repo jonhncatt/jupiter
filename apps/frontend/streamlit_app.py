@@ -83,8 +83,21 @@ def render_result(data: Dict[str, Any]) -> None:
         )
         if fetch_meta.get("test_url"):
             st.write(f"- test_url: {fetch_meta.get('test_url')}")
+        if fetch_meta.get("zip_url"):
+            st.write(f"- zip_url: {fetch_meta.get('zip_url')}")
+        if fetch_meta.get("status_code") is not None:
+            st.write(f"- status_code: {fetch_meta.get('status_code')}")
+        if fetch_meta.get("final_url"):
+            st.write(f"- final_url: {fetch_meta.get('final_url')}")
+        if fetch_meta.get("has_cookie_header") is not None:
+            st.write(f"- has_cookie_header: {fetch_meta.get('has_cookie_header')}")
         if fetch_meta.get("top_files"):
             st.write(f"- top_files: {fetch_meta.get('top_files')}")
+        if show_debug_detail:
+            with st.expander("Fetch 内部步骤", expanded=False):
+                st.json(fetch_meta.get("steps", []))
+            with st.expander("Fetch Meta 全量", expanded=False):
+                st.json(fetch_meta)
 
     st.subheader("总体结论")
     st.write(data["overall_summary"])

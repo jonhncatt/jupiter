@@ -26,35 +26,78 @@ class LogFetcher:
             "reason": "",
             "test_url": zeus_test_url,
             "files_count": 0,
+            "steps": [],
         }
         # allow direct url override
         if zeus_test_url:
             test_url = zeus_test_url
+            meta["steps"].append({"step": "input.resolve", "strategy": "direct_url_or_path"})
         elif matrix_id and test_id:
             test_url = build_test_url(matrix_id, test_id, sku=sku)
+            meta["steps"].append(
+                {
+                    "step": "input.resolve",
+                    "strategy": "template",
+                    "template": settings.zeus_test_url_template,
+                    "sku": sku,
+                    "matrix_id": matrix_id,
+                    "test_id": test_id,
+                }
+            )
         else:
             reason = "missing_matrix_or_test_or_url"
             logger.warning("No matrix_id/test_id/test_url provided -> fallback mock log")
             meta.update({"reason": reason})
+            meta["steps"].append({"step": "fetch.skip", "reason": reason})
             return {"raw_log": _mock_log(), "meta": meta}
 
         meta["test_url"] = test_url
         try:
             if _is_local_source(test_url):
                 meta["source"] = "local_zip"
-                zip_bytes = _read_local_zip_bytes(test_url)
+                zip_bytes, local_meta = _read_local_zip_bytes_detail(test_url)
+                meta.update(local_meta)
+                meta["steps"].append(
+                    {
+                        "step": "fetch.local_zip",
+                        "selected_zip_path": local_meta.get("selected_zip_path"),
+                        "mode": local_meta.get("local_mode"),
+                    }
+                )
             else:
                 meta["source"] = "zeus_http"
-                zip_bytes = await self.zeus.download_logs_zip(test_url=test_url)
+                zeus_detail = await self.zeus.download_logs_zip_detail(test_url=test_url)
+                zip_bytes = zeus_detail["zip_bytes"]
+                meta.update(zeus_detail.get("meta", {}))
+                meta["steps"].append(
+                    {
+                        "step": "fetch.zeus_http",
+                        "zip_url": meta.get("zip_url"),
+                        "status_code": meta.get("status_code"),
+                        "final_url": meta.get("final_url"),
+                        "content_type": meta.get("content_type"),
+                        "content_length": meta.get("content_length"),
+                        "has_cookie_header": meta.get("has_cookie_header"),
+                    }
+                )
             files = extract_text_files(zip_bytes)
             if not files:
                 reason = "zip_has_no_text_files"
                 logger.warning("zip extracted no text files -> fallback mock log")
                 meta.update({"source": "mock", "reason": reason, "files_count": 0})
+                meta["steps"].append({"step": "zip.extract", "status": "empty", "reason": reason})
                 return {"raw_log": _mock_log(), "meta": meta}
             meta.update(
                 {
                     "reason": "ok",
+                    "files_count": len(files),
+                    "top_files": [name for name, _ in files[:5]],
+                }
+            )
+            meta["steps"].append(
+                {
+                    "step": "zip.extract",
+                    "status": "ok",
                     "files_count": len(files),
                     "top_files": [name for name, _ in files[:5]],
                 }
@@ -64,6 +107,7 @@ class LogFetcher:
             reason = f"fetch_failed:{e}"
             logger.warning("fetch_raw_log failed: %s -> fallback mock", e)
             meta.update({"source": "mock", "reason": reason})
+            meta["steps"].append({"step": "fetch.failed", "reason": reason})
             return {"raw_log": _mock_log(), "meta": meta}
 
     async def fetch_raw_log(
@@ -101,31 +145,46 @@ def _is_local_source(path_or_url: str) -> bool:
 
 
 def _read_local_zip_bytes(path_or_url: str) -> bytes:
+    data, _ = _read_local_zip_bytes_detail(path_or_url)
+    return data
+
+
+def _read_local_zip_bytes_detail(path_or_url: str) -> tuple[bytes, dict]:
     path = (path_or_url or "").strip()
     if path.lower().startswith("file://"):
         path = path[7:]
+    meta: dict = {
+        "local_input_path": path,
+        "local_mode": "",
+        "selected_zip_path": "",
+    }
 
     # Case 1: direct zip file path.
     if os.path.isfile(path):
+        meta.update({"local_mode": "direct_zip", "selected_zip_path": path})
         with open(path, "rb") as f:
-            return f.read()
+            return f.read(), meta
 
     # Case 2: directory path containing logsarchive.zip (or other zip fallback).
     if os.path.isdir(path):
+        meta["local_mode"] = "directory_scan"
         direct_zip = os.path.join(path, settings.zeus_log_zip_name)
         if os.path.isfile(direct_zip):
+            meta.update({"selected_zip_path": direct_zip})
             with open(direct_zip, "rb") as f:
-                return f.read()
+                return f.read(), meta
 
         zip_candidates = [
             os.path.join(path, name)
             for name in os.listdir(path)
             if name.lower().endswith(".zip")
         ]
+        meta["zip_candidates"] = zip_candidates[:20]
         if zip_candidates:
             zip_candidates.sort()
+            meta.update({"selected_zip_path": zip_candidates[0]})
             with open(zip_candidates[0], "rb") as f:
-                return f.read()
+                return f.read(), meta
 
         raise FileNotFoundError(f"No zip found under directory: {path}")
 

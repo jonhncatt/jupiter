@@ -13,4 +13,5 @@ async def test_fetch_agent_exposes_mock_reason_when_input_missing():
     fetch_meta = out["fetch_meta"]
     assert fetch_meta["source"] == "mock"
     assert fetch_meta["reason"] == "missing_matrix_or_test_or_url"
+    assert fetch_meta["steps"][-1]["step"] == "fetch.skip"
     assert "timeout waiting for controller ready" in out["raw_log"]
