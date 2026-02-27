@@ -37,6 +37,9 @@ class CoreAgent:
         q = (query or "").lower()
         tokens = (parsed or {}).get("tokens") or {}
         highlights = (parsed or {}).get("highlights") or []
+        domain = (parsed or {}).get("domain_context") or {}
+        pcb = domain.get("pcb_console") or {}
+        nvmecore = domain.get("nvmecore") or {}
 
         selected_tools: List[str] = []
         reasons: List[str] = []
@@ -75,20 +78,36 @@ class CoreAgent:
             ]
         ) or bool(
             re.search(r"\b(function|module|driver|path)\b", q)
-        )
+        ) or bool(tokens.get("pcb_has_script_line") or pcb.get("script_line"))
 
         needs_jira = any(k in q for k in ["jira", "ticket", "issue", "缺陷", "单号"])
+        needs_jira = needs_jira or any(k in q for k in ["之前", "类似", "以前", "历史", "怎么处理", "是否发生过"])
+
+        if pcb.get("status") in {"fail", "skip"}:
+            reasons.append(
+                "PCB_TESTLOG_CONSOLE_OUTPUT.txt 显示失败/跳过状态，优先结合脚本行号与测试名分析。"
+            )
+            if "tp" not in selected_tools:
+                selected_tools.append("tp")
+
+        if nvmecore.get("command_lines"):
+            reasons.append("nvmecore_log.txt 尾部存在命令/回复记录，可交给 Spec expert 解读。")
+            if "spec" not in selected_tools:
+                selected_tools.append("spec")
 
         if not wants_summary_only:
             if needs_spec:
-                selected_tools.append("spec")
+                if "spec" not in selected_tools:
+                    selected_tools.append("spec")
                 reasons.append("问题或日志包含规范/协议相关线索，需查Spec RAG。")
             if needs_tp:
-                selected_tools.append("tp")
+                if "tp" not in selected_tools:
+                    selected_tools.append("tp")
                 reasons.append("问题涉及代码实现或函数路径，需查TP RAG。")
             if needs_jira:
-                selected_tools.append("jira")
-                reasons.append("用户提到缺陷单信息，尝试Jira通道（当前为stub）。")
+                if "jira" not in selected_tools:
+                    selected_tools.append("jira")
+                reasons.append("用户想查历史类似问题/处理方式，尝试Jira知识库。")
 
         # If no explicit route but log has significant error signals, do a minimal RAG route.
         if not selected_tools and not wants_summary_only and highlights:

@@ -30,10 +30,17 @@ class SpecAgent(BaseAgent):
                 await out
 
         max_rounds = max(1, min(int(context.get("round_hint", 1) or 1), 3))
+        domain = context.get("domain_context") or {}
+        pcb = domain.get("pcb_console") or {}
+        nvmecore = domain.get("nvmecore") or {}
         base_prompt = (
             "你是SSD/NVMe规范助手。请基于知识库回答问题，并给出可引用证据（尽量包含原文片段、章节或术语）。\n"
             f"问题：{query}\n"
             f"上下文tokens：{context.get('tokens')}\n"
+            f"PCB状态：status={pcb.get('status')} test={pcb.get('test_name')} rev={pcb.get('revision')} line={pcb.get('script_line')}\n"
+            "nvmecore最后关键命令/回复：\n"
+            + "\n".join(nvmecore.get("command_lines", [])[:12])
+            + "\n"
         )
 
         evidences = []

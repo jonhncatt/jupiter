@@ -3,6 +3,12 @@ import zipfile
 from typing import List, Tuple
 
 
+PRIMARY_LOG_FILES = [
+    "pcb_testlog_console_output.txt",
+    "nvmecore_log.txt",
+]
+
+
 def list_zip_members(zip_bytes: bytes) -> List[str]:
     with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as z:
         return z.namelist()
@@ -31,6 +37,9 @@ def extract_text_files(
         def score(n: str) -> int:
             nl = n.lower()
             s = 0
+            for idx, target in enumerate(PRIMARY_LOG_FILES):
+                if nl.endswith(target):
+                    s += 100 - idx * 10
             if "main" in nl:
                 s += 5
             if "console" in nl:
@@ -63,6 +72,8 @@ def extract_text_files(
             if not text.strip():
                 continue
 
+            text = _trim_text_by_filename(name, text)
+
             total += len(text)
             if total > max_total_chars:
                 break
@@ -76,3 +87,17 @@ def merge_texts(files: List[Tuple[str, str]]) -> str:
         chunks.append(f"\n===== FILE: {fn} =====\n")
         chunks.append(txt)
     return "\n".join(chunks)
+
+
+def _trim_text_by_filename(name: str, text: str) -> str:
+    nl = name.lower()
+    if nl.endswith("nvmecore_log.txt"):
+        lines = text.splitlines()
+        tail = lines[-200:] if len(lines) > 200 else lines
+        return "\n".join(tail)
+    if nl.endswith("pcb_testlog_console_output.txt"):
+        lines = text.splitlines()
+        if len(lines) > 400:
+            lines = lines[:220] + ["", "===== SNIP =====", ""] + lines[-180:]
+        return "\n".join(lines)
+    return text

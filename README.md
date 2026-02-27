@@ -407,6 +407,18 @@ ZEUS_COOKIE=...
 - LLM 驱动：`IntentParserAgent`、`CoreAgent.finalize`、各 Expert 调用的 Dify（Dify 内部一般为检索+LLM）。  
 - 非 LLM（确定性工具/规则）：`InputValidator`、`FetchAgent`、`LogParser`、`CoreAgent.plan`（当前实现）。  
 
+### 9.2 当前内置的日志解析规则
+
+- 优先关注 `PCB_TESTLOG_CONSOLE_OUTPUT.txt`
+  - 读取底部的 `pass/fail/skip`
+  - 尝试提取测试名、`Rev`、以及 `#` 后的脚本行号
+  - 出现脚本行号时，会更倾向调 `TP Expert`
+- 其次关注 `nvmecore_log.txt`
+  - 默认只保留末尾约 200 行，避免超大文件拖慢分析
+  - 重点看发送命令与回复结果
+  - 看不懂命令/回复时，会更倾向调 `Spec Expert`
+- 如果用户想查“之前是否发生过 / 怎么处理”，会更倾向调 `Jira Expert`
+
 ---
 
 ## 10. API 示例

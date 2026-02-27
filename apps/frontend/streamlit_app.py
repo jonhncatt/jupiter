@@ -192,6 +192,7 @@ def render_result(data: Dict[str, Any]) -> None:
             st.write(f"- warnings: {len(parsed.get('warnings', []))}")
             st.write(f"- highlights: {len(parsed.get('highlights', []))}")
             st.write(f"- tokens: {parsed.get('tokens', {})}")
+            st.write(f"- domain_context: {parsed.get('domain_context', {})}")
             st.write("sample errors:")
             for line in parsed.get("errors", [])[:10]:
                 st.write(f"- {line}")

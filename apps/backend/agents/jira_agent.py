@@ -45,6 +45,7 @@ class JiraAgent(BaseAgent):
             "优先包含：单号、标题、状态、根因描述、修复建议或关联记录。\n"
             f"问题：{query}\n"
             f"上下文highlights：{context.get('highlights')}\n"
+            f"PCB console: {((context.get('domain_context') or {}).get('pcb_console') or {}).get('status_line')}\n"
         )
         await emit("agent.round", {"round": 1, "status": "started", "query_preview": query[:200]})
         try:

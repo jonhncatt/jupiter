@@ -229,6 +229,7 @@ def make_nodes(
             "warnings": p.warnings,
             "highlights": p.highlights,
             "tokens": p.tokens,
+            "domain_context": p.domain_context,
         }
         trace = _append_trace(
             state,
@@ -253,6 +254,7 @@ def make_nodes(
                 "highlights": trace[-1]["highlights"],
                 "tokens": parsed.get("tokens", {}),
                 "sample_errors": parsed.get("errors", [])[:3],
+                "domain_context": parsed.get("domain_context", {}),
             },
         )
         return {**state, "parsed": parsed, "debug_trace": trace}
@@ -305,6 +307,7 @@ def make_nodes(
         ctx = {
             "tokens": state["parsed"]["tokens"],
             "highlights": state["parsed"]["highlights"],
+            "domain_context": state["parsed"].get("domain_context", {}),
             "round_hint": plan.get("round_hint", 1),
             "event_callback": state.get("event_callback"),
             "run_id": state.get("run_id"),
