@@ -2,6 +2,7 @@ import inspect
 
 from apps.backend.agents.base import BaseAgent
 from apps.backend.core.models import ToolResult, Evidence
+from apps.backend.prompts.log_analysis_skill import TP_EXPERT_PLAYBOOK
 from apps.backend.tools.dify_client import DifyClient, dify_text_and_citations
 
 
@@ -33,7 +34,8 @@ class TpAgent(BaseAgent):
         domain = context.get("domain_context") or {}
         pcb = domain.get("pcb_console") or {}
         base_prompt = (
-            "你是测试源代码/测试元代码助手（TP）。请从知识库（代码、头文件、实现）中定位相关函数/逻辑，"
+            TP_EXPERT_PLAYBOOK.strip()
+            + "\n\n你是测试源代码/测试元代码助手（TP）。请从知识库（代码、头文件、实现）中定位相关函数/逻辑，"
             "输出：函数名、关键代码片段、解释。\n"
             f"问题：{query}\n"
             f"上下文：{context.get('highlights')}\n"

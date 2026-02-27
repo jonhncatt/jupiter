@@ -305,6 +305,7 @@ def make_nodes(
         )
         plan = state.get("core_plan", {})
         selected = plan.get("selected_tools", []) or []
+        expert_queries = plan.get("expert_queries", {}) or {}
 
         ctx = {
             "tokens": state["parsed"]["tokens"],
@@ -314,22 +315,48 @@ def make_nodes(
             "event_callback": state.get("event_callback"),
             "run_id": state.get("run_id"),
         }
-        q = state["user_query"]
 
         tasks = []
         task_names = []
 
         if "spec" in selected:
-            await _emit_event(state, "agent.started", {"agent": "spec_agent(dify)", "run_id": state.get("run_id")})
-            tasks.append(spec.run(q, ctx))
+            spec_query = expert_queries.get("spec") or state["user_query"]
+            await _emit_event(
+                state,
+                "agent.started",
+                {
+                    "agent": "spec_agent(dify)",
+                    "run_id": state.get("run_id"),
+                    "query_preview": spec_query[:300],
+                },
+            )
+            tasks.append(spec.run(spec_query, ctx))
             task_names.append("spec")
         if "tp" in selected:
-            await _emit_event(state, "agent.started", {"agent": "tp_agent(dify)", "run_id": state.get("run_id")})
-            tasks.append(tp.run(q, ctx))
+            tp_query = expert_queries.get("tp") or state["user_query"]
+            await _emit_event(
+                state,
+                "agent.started",
+                {
+                    "agent": "tp_agent(dify)",
+                    "run_id": state.get("run_id"),
+                    "query_preview": tp_query[:300],
+                },
+            )
+            tasks.append(tp.run(tp_query, ctx))
             task_names.append("tp")
         if "jira" in selected:
-            await _emit_event(state, "agent.started", {"agent": "jira_agent(dify)", "run_id": state.get("run_id")})
-            tasks.append(jira.run(q, ctx))
+            jira_query = expert_queries.get("jira") or state["user_query"]
+            await _emit_event(
+                state,
+                "agent.started",
+                {
+                    "agent": "jira_agent(dify)",
+                    "run_id": state.get("run_id"),
+                    "query_preview": jira_query[:300],
+                },
+            )
+            tasks.append(jira.run(jira_query, ctx))
             task_names.append("jira")
 
         results = await asyncio.gather(*tasks, return_exceptions=True) if tasks else []
@@ -378,6 +405,7 @@ def make_nodes(
                 "node": "experts",
                 "duration_ms": round((time.perf_counter() - t0) * 1000, 2),
                 "selected_tools": selected,
+                "expert_queries": expert_queries,
                 "results": [{"tool": r.tool, "ok": r.ok, "summary": r.summary} for r in tool_results],
             },
         )
@@ -390,6 +418,7 @@ def make_nodes(
                 "status": "ok" if all(r.ok for r in tool_results) else "warn",
                 "duration_ms": trace[-1]["duration_ms"],
                 "selected_tools": trace[-1]["selected_tools"],
+                "expert_queries": trace[-1]["expert_queries"],
                 "results": trace[-1]["results"],
             },
         )

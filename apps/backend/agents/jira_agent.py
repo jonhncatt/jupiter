@@ -3,6 +3,7 @@ from typing import Optional
 
 from apps.backend.agents.base import BaseAgent
 from apps.backend.core.models import ToolResult, Evidence
+from apps.backend.prompts.log_analysis_skill import JIRA_EXPERT_PLAYBOOK
 from apps.backend.tools.dify_client import DifyClient, dify_text_and_citations
 
 
@@ -41,7 +42,8 @@ class JiraAgent(BaseAgent):
             )
 
         prompt = (
-            "你是Jira缺陷知识助手。请基于Jira知识库返回与问题相关的缺陷信息，"
+            JIRA_EXPERT_PLAYBOOK.strip()
+            + "\n\n你是Jira缺陷知识助手。请基于Jira知识库返回与问题相关的缺陷信息，"
             "优先包含：单号、标题、状态、根因描述、修复建议或关联记录。\n"
             f"问题：{query}\n"
             f"上下文highlights：{context.get('highlights')}\n"

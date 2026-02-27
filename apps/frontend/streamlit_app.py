@@ -190,6 +190,8 @@ def render_result(data: Dict[str, Any]) -> None:
             st.json(raw.get("validation", {}))
         with st.expander("Core 路由决策", expanded=False):
             st.json(raw.get("core_plan", {}))
+        with st.expander("Core 给 Expert 的任务", expanded=False):
+            st.json((raw.get("core_plan") or {}).get("expert_queries", {}))
         with st.expander("Parser 输出", expanded=False):
             parsed = raw.get("parsed", {})
             st.write(f"- errors: {len(parsed.get('errors', []))}")

@@ -158,6 +158,8 @@ jupiter/
         spec_agent.py
         tp_agent.py
         jira_agent.py
+      prompts/
+        log_analysis_skill.py
       tools/
         zeus_portal.py
         dify_client.py
@@ -418,6 +420,15 @@ ZEUS_COOKIE=...
   - 重点看发送命令与回复结果
   - 看不懂命令/回复时，会更倾向调 `Spec Expert`
 - 如果用户想查“之前是否发生过 / 怎么处理”，会更倾向调 `Jira Expert`
+
+### 9.3 软规则（Prompt Skill）
+
+- `apps/backend/prompts/log_analysis_skill.py`
+- 这不是 Codex 平台的 `AGENTS.md`，而是 Jupiter 运行时自己的 prompt policy
+- 作用：
+  - 约束 `CoreAgent` 先分析，再按需给每个 expert 下发不同任务
+  - 约束 `Spec/TP/Jira` 各自遵循固定分析习惯
+  - 避免把用户原始问题直接广播给所有 expert
 
 ---
 

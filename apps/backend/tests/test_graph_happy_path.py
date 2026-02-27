@@ -12,11 +12,23 @@ async def test_graph_runs(monkeypatch):
     from apps.backend.agents.fetch_agent import FetchAgent
     from apps.backend.core.models import ToolResult, Evidence
 
+    seen_queries = {}
+
     async def fake_run(self, q, ctx):
+        seen_queries[self.name] = q
         return ToolResult(tool=self.name, ok=True, summary="fake", evidences=[Evidence(source="fake", snippet="s", meta={})])
 
     async def fake_core(self, q, parsed, raw_log=""):
-        return {"selected_tools": ["spec", "tp"], "reason": "mock route", "need_rag": True, "round_hint": 2}
+        return {
+            "selected_tools": ["spec", "tp"],
+            "reason": "mock route",
+            "need_rag": True,
+            "round_hint": 2,
+            "expert_queries": {
+                "spec": "spec specific query from core",
+                "tp": "tp specific query from core",
+            },
+        }
 
     async def fake_finalize(self, *, query, parsed, core_plan, expert_reports):
         return "根因：mock\n建议：mock\n下一步：mock"
@@ -88,3 +100,5 @@ async def test_graph_runs(monkeypatch):
     assert "draft_summary" in out
     assert "final_summary" in out
     assert out["core_plan"]["selected_tools"] == ["spec", "tp"]
+    assert seen_queries["spec_agent(dify)"] != "why"
+    assert seen_queries["spec_agent(dify)"] == "spec specific query from core"
