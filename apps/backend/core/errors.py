@@ -12,3 +12,11 @@ class ZeusDownloadError(JupiterError):
 
 class DifyError(JupiterError):
     pass
+
+
+class InputValidationError(JupiterError):
+    pass
+
+
+class LogFetchError(JupiterError):
+    pass

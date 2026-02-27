@@ -3,6 +3,7 @@ import zipfile
 
 import pytest
 
+from apps.backend.core.errors import LogFetchError
 from apps.backend.services.log_fetcher import LogFetcher
 from apps.backend.tools.zeus_portal import ZeusPortalClient
 
@@ -31,3 +32,15 @@ async def test_fetch_raw_log_from_local_directory(tmp_path, monkeypatch):
     )
     assert "timeout waiting for controller ready" in raw
 
+
+async def test_fetch_raw_log_from_invalid_explicit_path_raises(tmp_path):
+    fetcher = LogFetcher(ZeusPortalClient())
+    bad_path = str(tmp_path / "not-exist")
+
+    with pytest.raises(LogFetchError):
+        await fetcher.fetch_raw_log(
+            sku=None,
+            matrix_id=None,
+            test_id=None,
+            zeus_test_url=bad_path,
+        )

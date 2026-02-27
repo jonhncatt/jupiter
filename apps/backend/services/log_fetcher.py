@@ -2,6 +2,7 @@ import logging
 import os
 from typing import Optional
 
+from apps.backend.core.errors import LogFetchError
 from apps.backend.tools.zeus_portal import ZeusPortalClient, build_test_url
 from apps.backend.core.config import settings
 from apps.backend.services.zip_utils import extract_text_files, merge_texts
@@ -21,6 +22,7 @@ class LogFetcher:
         test_id: Optional[str],
         zeus_test_url: Optional[str],
     ) -> dict:
+        explicit_source = bool((zeus_test_url or "").strip() or (matrix_id and test_id))
         meta = {
             "source": "mock",
             "reason": "",
@@ -86,6 +88,8 @@ class LogFetcher:
                 logger.warning("zip extracted no text files -> fallback mock log")
                 meta.update({"source": "mock", "reason": reason, "files_count": 0})
                 meta["steps"].append({"step": "zip.extract", "status": "empty", "reason": reason})
+                if explicit_source:
+                    raise LogFetchError(f"Fetched zip but no supported text logs were found from source: {test_url}")
                 return {"raw_log": _mock_log(), "meta": meta}
             meta.update(
                 {
@@ -108,6 +112,8 @@ class LogFetcher:
             logger.warning("fetch_raw_log failed: %s -> fallback mock", e)
             meta.update({"source": "mock", "reason": reason})
             meta["steps"].append({"step": "fetch.failed", "reason": reason})
+            if explicit_source:
+                raise LogFetchError(f"Fetch failed for source `{test_url}`: {e}") from e
             return {"raw_log": _mock_log(), "meta": meta}
 
     async def fetch_raw_log(

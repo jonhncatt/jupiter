@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from apps.backend.core.config import settings
+from apps.backend.core.errors import JupiterError
 from apps.backend.core.models import AnalyzeRequest, AnalyzeResponse
 from apps.backend.services.cache import TTLCache
 from apps.backend.services.run_manager import RunManager
@@ -38,7 +39,10 @@ async def _analyze_impl(
 
 @router.post("/analyze", response_model=AnalyzeResponse)
 async def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
-    return await _analyze_impl(req, use_cache=True)
+    try:
+        return await _analyze_impl(req, use_cache=True)
+    except JupiterError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.post("/runs")

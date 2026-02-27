@@ -147,12 +147,25 @@ def make_nodes(
             "node.started",
             {"node": "fetch", "run_id": state.get("run_id"), "status": "started"},
         )
-        fetched = await fetch_agent.run(
-            sku=state.get("sku"),
-            matrix_id=state.get("matrix_id"),
-            test_id=state.get("test_id"),
-            zeus_test_url=state.get("zeus_test_url"),
-        )
+        try:
+            fetched = await fetch_agent.run(
+                sku=state.get("sku"),
+                matrix_id=state.get("matrix_id"),
+                test_id=state.get("test_id"),
+                zeus_test_url=state.get("zeus_test_url"),
+            )
+        except Exception as e:
+            await _emit_event(
+                state,
+                "node.failed",
+                {
+                    "node": "fetch",
+                    "run_id": state.get("run_id"),
+                    "status": "error",
+                    "error": str(e)[:500],
+                },
+            )
+            raise
         trace = _append_trace(
             state,
             {
