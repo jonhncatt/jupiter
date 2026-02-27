@@ -90,6 +90,7 @@ class LogFetcher:
             members = list_zip_members(zip_bytes)
             meta["zip_member_count"] = len(members)
             meta["zip_members_preview"] = members[:20]
+            meta["zip_members_full"] = members[:200]
             files = extract_text_files(zip_bytes)
             if not files:
                 reason = "zip_has_no_text_files"
@@ -110,6 +111,7 @@ class LogFetcher:
                     "reason": "ok",
                     "files_count": len(files),
                     "top_files": [name for name, _ in files[:5]],
+                    "selected_text_files": [name for name, _ in files],
                     "extract_status": "ok",
                 }
             )
@@ -119,6 +121,7 @@ class LogFetcher:
                     "status": "ok",
                     "files_count": len(files),
                     "top_files": [name for name, _ in files[:5]],
+                    "selected_text_files": [name for name, _ in files],
                     "zip_member_count": meta.get("zip_member_count", 0),
                 }
             )

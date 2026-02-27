@@ -98,13 +98,17 @@ def render_result(data: Dict[str, Any]) -> None:
             st.write(f"- extract_status: {fetch_meta.get('extract_status')}")
         if fetch_meta.get("zip_member_count") is not None:
             st.write(f"- zip_member_count: {fetch_meta.get('zip_member_count')}")
-        if fetch_meta.get("zip_members_preview"):
-            st.write(f"- zip_members_preview: {fetch_meta.get('zip_members_preview')}")
+        if fetch_meta.get("selected_text_files"):
+            st.write(f"- selected_text_files_count: {len(fetch_meta.get('selected_text_files', []))}")
         if fetch_meta.get("top_files"):
-            st.write(f"- top_files: {fetch_meta.get('top_files')}")
+            st.write(f"- top_files(only first 5 selected text files): {fetch_meta.get('top_files')}")
         if show_debug_detail:
             with st.expander("Fetch 内部步骤", expanded=False):
                 st.json(fetch_meta.get("steps", []))
+            with st.expander("ZIP 内全部成员（最多显示前 200 个）", expanded=False):
+                st.json(fetch_meta.get("zip_members_full", fetch_meta.get("zip_members_preview", [])))
+            with st.expander("本次实际选中的文本日志文件", expanded=False):
+                st.json(fetch_meta.get("selected_text_files", []))
             with st.expander("Fetch Meta 全量", expanded=False):
                 st.json(fetch_meta)
 

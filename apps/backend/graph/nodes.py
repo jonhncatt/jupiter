@@ -212,6 +212,8 @@ def make_nodes(
                 "final_url": fetched.get("fetch_meta", {}).get("final_url"),
                 "extract_status": fetched.get("fetch_meta", {}).get("extract_status"),
                 "top_files": fetched.get("fetch_meta", {}).get("top_files", []),
+                "selected_text_files": fetched.get("fetch_meta", {}).get("selected_text_files", []),
+                "zip_member_count": fetched.get("fetch_meta", {}).get("zip_member_count", 0),
             },
         )
         return {**state, **fetched, "debug_trace": trace}

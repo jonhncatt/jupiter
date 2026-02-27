@@ -42,6 +42,7 @@ async def test_fetch_raw_log_from_local_directory(tmp_path, monkeypatch):
     assert meta["downloaded_zip_path"].endswith("logsarchive.zip")
     assert meta["extract_status"] == "ok"
     assert meta["zip_member_count"] >= 1
+    assert "main.log" in meta["selected_text_files"]
 
 
 async def test_fetch_raw_log_from_invalid_explicit_path_raises(tmp_path):
