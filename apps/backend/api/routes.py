@@ -22,7 +22,7 @@ cache = TTLCache(settings.cache_ttl_seconds)
 
 @router.post("/analyze", response_model=AnalyzeResponse)
 async def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
-    cache_key = f"{req.user_query}:{req.matrix_id}:{req.test_id}:{req.zeus_test_url}"
+    cache_key = f"{req.user_query}:{req.sku}:{req.matrix_id}:{req.test_id}:{req.zeus_test_url}"
     cached = cache.get(cache_key)
     if cached:
         return cached
@@ -50,6 +50,7 @@ async def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
     init = {
         "request_id": req.request_id,
         "user_query": req.user_query,
+        "sku": req.sku,
         "matrix_id": req.matrix_id,
         "test_id": req.test_id,
         "zeus_test_url": req.zeus_test_url,

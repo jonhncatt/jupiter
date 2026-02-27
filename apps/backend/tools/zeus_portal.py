@@ -1,7 +1,8 @@
 import json
 import logging
+import string
 import httpx
-from typing import Dict
+from typing import Dict, Optional
 from apps.backend.core.config import settings
 from apps.backend.core.errors import ConfigError, ZeusDownloadError
 from apps.backend.core.tls import tls_verify
@@ -9,10 +10,32 @@ from apps.backend.core.tls import tls_verify
 logger = logging.getLogger(__name__)
 
 
-def build_test_url(matrix_id: str, test_id: str) -> str:
+def build_test_url(matrix_id: str, test_id: str, *, sku: Optional[str] = None) -> str:
     if not settings.zeus_test_url_template:
         raise ConfigError("ZEUS_TEST_URL_TEMPLATE is empty")
-    return settings.zeus_test_url_template.format(matrix_id=matrix_id, test_id=test_id)
+    template = settings.zeus_test_url_template
+    values = {
+        "matrix_id": matrix_id,
+        "test_id": test_id,
+        "sku": (sku or settings.zeus_sku_default or "").strip(),
+    }
+
+    fields = {field_name for _, field_name, _, _ in string.Formatter().parse(template) if field_name}
+    unsupported_fields = [name for name in fields if name not in values]
+    if unsupported_fields:
+        raise ConfigError(
+            f"Unsupported placeholders in ZEUS_TEST_URL_TEMPLATE: {', '.join(sorted(unsupported_fields))}. "
+            "Supported placeholders: {matrix_id}, {test_id}, {sku}"
+        )
+
+    missing_fields = [name for name in fields if not values.get(name)]
+    if missing_fields:
+        raise ConfigError(
+            f"Missing Zeus URL params for template: {', '.join(sorted(missing_fields))}. "
+            "Please provide request.sku or set ZEUS_SKU_DEFAULT."
+        )
+
+    return template.format(**values)
 
 
 def _headers() -> Dict[str, str]:

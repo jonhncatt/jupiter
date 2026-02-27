@@ -13,6 +13,7 @@ class LogFetcher:
     async def fetch_raw_log(
         self,
         *,
+        sku: Optional[str],
         matrix_id: Optional[str],
         test_id: Optional[str],
         zeus_test_url: Optional[str],
@@ -21,7 +22,7 @@ class LogFetcher:
         if zeus_test_url:
             test_url = zeus_test_url
         elif matrix_id and test_id:
-            test_url = build_test_url(matrix_id, test_id)
+            test_url = build_test_url(matrix_id, test_id, sku=sku)
         else:
             logger.warning("No matrix_id/test_id/test_url provided -> fallback mock log")
             return _mock_log()

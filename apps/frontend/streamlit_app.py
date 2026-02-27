@@ -7,10 +7,12 @@ BACKEND = os.getenv("JUPITER_BACKEND", "http://backend:8000")
 st.set_page_config(page_title="Jupiter", layout="wide")
 st.title("Jupiter - Zeus Log + Dify RAG")
 
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 with col1:
-    matrix_id = st.text_input("matrix id", value="")
+    sku = st.text_input("sku", value="")
 with col2:
+    matrix_id = st.text_input("matrix id", value="")
+with col3:
     test_id = st.text_input("test id", value="")
 
 user_query = st.text_area(
@@ -22,6 +24,7 @@ if st.button("分析"):
     payload = {
         "request_id": "req-streamlit-001",
         "user_query": user_query,
+        "sku": sku or None,
         "matrix_id": matrix_id or None,
         "test_id": test_id or None,
         "zeus_test_url": zeus_test_url or None,

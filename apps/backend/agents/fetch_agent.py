@@ -17,11 +17,13 @@ class FetchAgent:
     async def run(
         self,
         *,
+        sku: Optional[str],
         matrix_id: Optional[str],
         test_id: Optional[str],
         zeus_test_url: Optional[str],
     ) -> Dict[str, Any]:
         raw_log = await self.fetcher.fetch_raw_log(
+            sku=sku,
             matrix_id=matrix_id,
             test_id=test_id,
             zeus_test_url=zeus_test_url,
@@ -30,6 +32,7 @@ class FetchAgent:
             "raw_log": raw_log,
             "fetch_meta": {
                 "agent": self.name,
+                "sku": sku,
                 "matrix_id": matrix_id,
                 "test_id": test_id,
                 "zeus_test_url": zeus_test_url,

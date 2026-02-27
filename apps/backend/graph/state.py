@@ -5,6 +5,7 @@ from apps.backend.core.models import ToolResult
 class GraphState(TypedDict, total=False):
     request_id: str
     user_query: str
+    sku: str
     matrix_id: str
     test_id: str
     zeus_test_url: str

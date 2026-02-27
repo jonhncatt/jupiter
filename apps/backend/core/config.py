@@ -16,8 +16,9 @@ class Settings(BaseSettings):
     zeus_test_url_template: str = Field(
         default="",
         alias="ZEUS_TEST_URL_TEMPLATE",
-        description="e.g. https://zeus.xxx.com/test/{matrix_id}/{test_id}",
+        description="e.g. https://zeus.xxx.com/{sku}/test/{matrix_id}/{test_id}",
     )
+    zeus_sku_default: str = Field(default="", alias="ZEUS_SKU_DEFAULT")
     zeus_log_zip_name: str = Field(default="logsarchive.zip", alias="ZEUS_LOG_ZIP_NAME")
     zeus_cookie: str = Field(default="", alias="ZEUS_COOKIE")
     zeus_extra_headers_json: str = Field(default="", alias="ZEUS_EXTRA_HEADERS_JSON")

@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 class AnalyzeRequest(BaseModel):
     request_id: str = Field(default="req-001")
     user_query: str
+    sku: Optional[str] = None
     matrix_id: Optional[str] = None
     test_id: Optional[str] = None
     # 允许以后扩展：直接给完整链接/本地路径

@@ -1,7 +1,7 @@
 # Jupiter（Zeus 日志 + Dify RAG + CoreAgent 编排）
 
 Jupiter 是一个面向 SSD/NVMe 测试分析的后端系统：  
-输入 `matrix_id/test_id + 用户问题`，自动获取 Zeus 日志、解析关键信号、按需调用 Dify 知识库（Spec/TP/Jira），最后输出结构化结论。
+输入 `sku/matrix_id/test_id + 用户问题`，自动获取 Zeus 日志、解析关键信号、按需调用 Dify 知识库（Spec/TP/Jira），最后输出结构化结论。
 
 ---
 
@@ -81,6 +81,7 @@ cp .env.example .env
 2. 填写 `.env` 关键项（至少）
 
 - `ZEUS_TEST_URL_TEMPLATE`
+- `ZEUS_SKU_DEFAULT`（如链接包含 `{sku}`）
 - `ZEUS_COOKIE`
 - `DIFY_BASE_URL`
 - `DIFY_SPEC_APP_KEY`
@@ -168,7 +169,8 @@ streamlit run apps/frontend/streamlit_app.py --server.port 8502
 
 | 变量 | 说明 | 示例 |
 |---|---|---|
-| `ZEUS_TEST_URL_TEMPLATE` | Zeus 测试页面模板（用 matrix/test 拼接） | `https://zeus.example.com/test/{matrix_id}/{test_id}` |
+| `ZEUS_TEST_URL_TEMPLATE` | Zeus 测试页面模板（支持 sku/matrix/test 拼接） | `https://zeus.example.com/{sku}/test/{matrix_id}/{test_id}` |
+| `ZEUS_SKU_DEFAULT` | 默认 SKU（模板包含 `{sku}` 且请求未传 sku 时使用） | `nx1` |
 | `ZEUS_LOG_ZIP_NAME` | 日志压缩包名 | `logsarchive.zip` |
 | `ZEUS_COOKIE` | 从浏览器复制的完整 Cookie 值 | `session=...; token=...` |
 | `ZEUS_EXTRA_HEADERS_JSON` | 额外请求头（JSON） | `{"X-Token":"abc"}` |
@@ -249,6 +251,7 @@ curl -X POST http://localhost:8000/api/analyze \
   -d '{
     "request_id": "req-001",
     "user_query": "这个 timeout waiting for controller ready 可能根因是什么？",
+    "sku": "nx1",
     "matrix_id": "123",
     "test_id": "456"
   }'

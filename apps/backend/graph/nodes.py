@@ -19,6 +19,7 @@ def make_nodes(
 ):
     async def node_fetch(state: GraphState) -> GraphState:
         fetched = await fetch_agent.run(
+            sku=state.get("sku"),
             matrix_id=state.get("matrix_id"),
             test_id=state.get("test_id"),
             zeus_test_url=state.get("zeus_test_url"),
