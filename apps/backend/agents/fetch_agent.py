@@ -22,12 +22,14 @@ class FetchAgent:
         test_id: Optional[str],
         zeus_test_url: Optional[str],
     ) -> Dict[str, Any]:
-        raw_log = await self.fetcher.fetch_raw_log(
+        detail = await self.fetcher.fetch_raw_log_detail(
             sku=sku,
             matrix_id=matrix_id,
             test_id=test_id,
             zeus_test_url=zeus_test_url,
         )
+        raw_log = detail["raw_log"]
+        meta = detail.get("meta", {})
         return {
             "raw_log": raw_log,
             "fetch_meta": {
@@ -36,5 +38,6 @@ class FetchAgent:
                 "matrix_id": matrix_id,
                 "test_id": test_id,
                 "zeus_test_url": zeus_test_url,
+                **meta,
             },
         }

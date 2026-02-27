@@ -13,6 +13,59 @@ class LogFetcher:
     def __init__(self, zeus: ZeusPortalClient):
         self.zeus = zeus
 
+    async def fetch_raw_log_detail(
+        self,
+        *,
+        sku: Optional[str],
+        matrix_id: Optional[str],
+        test_id: Optional[str],
+        zeus_test_url: Optional[str],
+    ) -> dict:
+        meta = {
+            "source": "mock",
+            "reason": "",
+            "test_url": zeus_test_url,
+            "files_count": 0,
+        }
+        # allow direct url override
+        if zeus_test_url:
+            test_url = zeus_test_url
+        elif matrix_id and test_id:
+            test_url = build_test_url(matrix_id, test_id, sku=sku)
+        else:
+            reason = "missing_matrix_or_test_or_url"
+            logger.warning("No matrix_id/test_id/test_url provided -> fallback mock log")
+            meta.update({"reason": reason})
+            return {"raw_log": _mock_log(), "meta": meta}
+
+        meta["test_url"] = test_url
+        try:
+            if _is_local_source(test_url):
+                meta["source"] = "local_zip"
+                zip_bytes = _read_local_zip_bytes(test_url)
+            else:
+                meta["source"] = "zeus_http"
+                zip_bytes = await self.zeus.download_logs_zip(test_url=test_url)
+            files = extract_text_files(zip_bytes)
+            if not files:
+                reason = "zip_has_no_text_files"
+                logger.warning("zip extracted no text files -> fallback mock log")
+                meta.update({"source": "mock", "reason": reason, "files_count": 0})
+                return {"raw_log": _mock_log(), "meta": meta}
+            meta.update(
+                {
+                    "reason": "ok",
+                    "files_count": len(files),
+                    "top_files": [name for name, _ in files[:5]],
+                }
+            )
+            return {"raw_log": merge_texts(files), "meta": meta}
+        except Exception as e:
+            reason = f"fetch_failed:{e}"
+            logger.warning("fetch_raw_log failed: %s -> fallback mock", e)
+            meta.update({"source": "mock", "reason": reason})
+            return {"raw_log": _mock_log(), "meta": meta}
+
     async def fetch_raw_log(
         self,
         *,
@@ -21,28 +74,14 @@ class LogFetcher:
         test_id: Optional[str],
         zeus_test_url: Optional[str],
     ) -> str:
-        # allow direct url override
-        if zeus_test_url:
-            test_url = zeus_test_url
-        elif matrix_id and test_id:
-            test_url = build_test_url(matrix_id, test_id, sku=sku)
-        else:
-            logger.warning("No matrix_id/test_id/test_url provided -> fallback mock log")
-            return _mock_log()
-
-        try:
-            if _is_local_source(test_url):
-                zip_bytes = _read_local_zip_bytes(test_url)
-            else:
-                zip_bytes = await self.zeus.download_logs_zip(test_url=test_url)
-            files = extract_text_files(zip_bytes)
-            if not files:
-                logger.warning("zip extracted no text files -> fallback mock log")
-                return _mock_log()
-            return merge_texts(files)
-        except Exception as e:
-            logger.warning("fetch_raw_log failed: %s -> fallback mock", e)
-            return _mock_log()
+        # backward-compatible API for existing callers/tests
+        detail = await self.fetch_raw_log_detail(
+            sku=sku,
+            matrix_id=matrix_id,
+            test_id=test_id,
+            zeus_test_url=zeus_test_url,
+        )
+        return detail["raw_log"]
 
 
 def _is_local_source(path_or_url: str) -> bool:

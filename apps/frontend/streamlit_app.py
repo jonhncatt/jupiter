@@ -73,6 +73,17 @@ use_run_api = st.checkbox("实时显示多Agent轨迹（推荐）", value=True)
 
 
 def render_result(data: Dict[str, Any]) -> None:
+    fetch_meta = (data.get("raw") or {}).get("fetch_meta") or {}
+    if fetch_meta:
+        st.subheader("Fetch 状态")
+        st.write(
+            f"- source={fetch_meta.get('source')} | reason={fetch_meta.get('reason')} | files_count={fetch_meta.get('files_count', 0)}"
+        )
+        if fetch_meta.get("test_url"):
+            st.write(f"- test_url: {fetch_meta.get('test_url')}")
+        if fetch_meta.get("top_files"):
+            st.write(f"- top_files: {fetch_meta.get('top_files')}")
+
     st.subheader("总体结论")
     st.write(data["overall_summary"])
 

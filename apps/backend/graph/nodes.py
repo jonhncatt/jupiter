@@ -69,6 +69,9 @@ def make_nodes(
                 "run_id": state.get("run_id"),
                 "duration_ms": trace[-1]["duration_ms"],
                 "raw_log_chars": trace[-1]["raw_log_chars"],
+                "source": fetched.get("fetch_meta", {}).get("source", "-"),
+                "reason": fetched.get("fetch_meta", {}).get("reason", ""),
+                "files_count": fetched.get("fetch_meta", {}).get("files_count", 0),
             },
         )
         return {**state, **fetched, "debug_trace": trace}
