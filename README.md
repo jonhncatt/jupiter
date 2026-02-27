@@ -329,9 +329,9 @@ Windows（不激活 venv 的直接启动方式）：
 | `OPENAI_API_KEY` | 总结 LLM 的 API Key | `sk-...` |
 | `OPENAI_BASE_URL` | OpenAI-compatible 基地址 | `https://api.openai.com/v1` |
 | `OPENAI_MODEL` | 总结模型 | `gpt-4o-mini` |
-| `OPENAI_TEMPERATURE` | 全局温度；为空则各节点走自己的默认值 | `0.2` |
-| `OPENAI_INTENT_TEMPERATURE` | IntentParser 温度，建议更低保证 JSON 稳定 | `0.0` |
-| `OPENAI_FINALIZE_TEMPERATURE` | Finalize 温度，建议保留少量归纳能力 | `0.2` |
+| `OPENAI_TEMPERATURE` | 全局温度；若 Azure/兼容部署不支持 temperature，保持为空 | `` |
+| `OPENAI_INTENT_TEMPERATURE` | IntentParser 温度；不支持 temperature 的部署请留空 | `` |
+| `OPENAI_FINALIZE_TEMPERATURE` | Finalize 温度；不支持 temperature 的部署请留空 | `` |
 | `OFFICETOOL_CA_CERT_PATH` | 内网根证书路径（非常重要） | `/certs/CompanyInternalRootCA.cer` |
 | `COMPANY_CA_CERT_FILENAME` | Docker 构建时注入到镜像信任链的证书文件名（位于 `certs/`） | `CompanyInternalRootCA.cer` |
 | `PIP_INDEX_URL` | Docker 构建使用的 Python 包源（内网环境可指向私有镜像） | `https://pypi.example.com/simple` |

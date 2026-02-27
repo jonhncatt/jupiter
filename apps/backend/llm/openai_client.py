@@ -45,5 +45,18 @@ def chat(system: str, user: str, *, temperature: Optional[float | str] = None) -
     temp = _resolve_temperature(temperature)
     if temp is not None:
         kwargs["temperature"] = temp
-    r = c.chat.completions.create(**kwargs)
+    try:
+        r = c.chat.completions.create(**kwargs)
+    except Exception as e:
+        # Some Azure/OpenAI-compatible deployments reject any explicit temperature value.
+        if temp is not None and _supports_retry_without_temperature(e):
+            kwargs.pop("temperature", None)
+            r = c.chat.completions.create(**kwargs)
+        else:
+            raise
     return r.choices[0].message.content or ""
+
+
+def _supports_retry_without_temperature(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return "temperature" in msg and ("unsupported" in msg or "does not support" in msg)

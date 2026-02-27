@@ -134,7 +134,7 @@ class CoreAgent:
                 lines.append(f"  * ({ev.source}) {ev.snippet}")
 
         try:
-            temperature = settings.openai_finalize_temperature or settings.openai_temperature or "0.2"
+            temperature = settings.openai_finalize_temperature or settings.openai_temperature or None
             return chat(SYSTEM_FINALIZE, "\n".join(lines), temperature=temperature)
         except Exception as e:
             logger.warning("Core finalize failed: %s", e)

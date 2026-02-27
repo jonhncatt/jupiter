@@ -58,7 +58,7 @@ class IntentParserAgent:
             "请只输出 JSON。"
         )
         try:
-            temperature = settings.openai_intent_temperature or settings.openai_temperature or "0.0"
+            temperature = settings.openai_intent_temperature or settings.openai_temperature or None
             raw = chat(SYSTEM_INTENT, user_prompt, temperature=temperature)
             llm_obj = _try_parse_json(raw)
             if not isinstance(llm_obj, dict):
