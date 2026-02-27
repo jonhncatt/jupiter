@@ -2,6 +2,7 @@ import logging
 import re
 from typing import Any, Dict, List
 
+from apps.backend.core.config import settings
 from apps.backend.core.models import ToolResult
 from apps.backend.llm.openai_client import chat
 
@@ -133,7 +134,8 @@ class CoreAgent:
                 lines.append(f"  * ({ev.source}) {ev.snippet}")
 
         try:
-            return chat(SYSTEM_FINALIZE, "\n".join(lines))
+            temperature = settings.openai_finalize_temperature or settings.openai_temperature or "0.2"
+            return chat(SYSTEM_FINALIZE, "\n".join(lines), temperature=temperature)
         except Exception as e:
             logger.warning("Core finalize failed: %s", e)
             return (

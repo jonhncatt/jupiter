@@ -58,7 +58,8 @@ class IntentParserAgent:
             "请只输出 JSON。"
         )
         try:
-            raw = chat(SYSTEM_INTENT, user_prompt)
+            temperature = settings.openai_intent_temperature or settings.openai_temperature or "0.0"
+            raw = chat(SYSTEM_INTENT, user_prompt, temperature=temperature)
             llm_obj = _try_parse_json(raw)
             if not isinstance(llm_obj, dict):
                 return _merge_with_heuristic(seed, user_query, note="llm_json_invalid")
