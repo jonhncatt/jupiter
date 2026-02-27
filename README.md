@@ -137,14 +137,31 @@ docker compose up -d
 
 ## 5. 本地运行（非 Docker）
 
-1. 安装依赖
+1. 创建并进入虚拟环境（建议 Python 3.11）
 
 ```bash
 cd /Users/dalizhou/openaicdx/jupiter
+# macOS / Linux
+python3.11 -m venv .venv
+source .venv/bin/activate
+```
+
+Windows PowerShell：
+
+```powershell
+cd C:\Users\yourname\openaicdx\jupiter
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+2. 在虚拟环境中安装依赖
+
+```bash
+python -m pip install -U pip
 python -m pip install -e .
 ```
 
-2. 准备环境变量
+3. 准备环境变量
 
 ```bash
 cp .env.example .env
@@ -152,19 +169,19 @@ cp .env.example .env
 
 按需填写 `.env`（与 Docker 相同，尤其是 `DIFY_*`、`ZEUS_*`、`OPENAI_*`、`OFFICETOOL_CA_CERT_PATH`）。
 
-3. 启动后端
+4. 在虚拟环境中启动后端
 
 ```bash
 uvicorn apps.backend.main:app --host 0.0.0.0 --port 8000
 ```
 
-4. 启动前端（新开一个终端）
+5. 启动前端（新开一个终端，并再次激活同一个 `.venv`）
 
 ```bash
 streamlit run apps/frontend/streamlit_app.py --server.port 8502
 ```
 
-5. 访问地址
+6. 访问地址
 
 - Backend Swagger: `http://localhost:8000/docs`
 - Streamlit: `http://localhost:8502`
