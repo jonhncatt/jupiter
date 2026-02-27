@@ -230,6 +230,9 @@ ZEUS_COOKIE=...
 如你的 Zeus 不是 `test_url/logsarchive.zip` 直连模式，可修改：  
 `apps/backend/tools/zeus_portal.py` 的 `resolve_zip_url()`。
 
+补充：`zeus_test_url` 也支持本地/共享目录路径（例如 Windows UNC：`\\\\server\\share\\...`）。  
+若传入目录，系统会优先读取目录下的 `logsarchive.zip`，找不到时会尝试读取该目录第一个 `.zip` 文件。
+
 ---
 
 ## 9. 运行流程（一次请求）

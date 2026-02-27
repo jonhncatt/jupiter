@@ -18,7 +18,7 @@ with col3:
 user_query = st.text_area(
     "你的问题", height=120, value="这个 log 里 timeout waiting for controller ready 可能根因是什么？"
 )
-zeus_test_url = st.text_input("可选：直接填写 Zeus test URL（覆盖 matrix/test 拼接）", value="")
+zeus_test_url = st.text_input("可选：直接填写 Zeus test URL/本地目录路径（覆盖 sku/matrix/test 拼接）", value="")
 
 if st.button("分析"):
     payload = {
