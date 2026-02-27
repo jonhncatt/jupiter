@@ -26,3 +26,25 @@ def test_input_validator_requires_source():
     out = v.validate(intent={}, request_payload={"user_query": "why fail"})
     assert out["valid"] is False
     assert "missing_matrix_or_test_or_zeus_test_url" in out["errors"]
+
+
+def test_input_validator_rejects_missing_local_path():
+    v = InputValidator()
+    out = v.validate(
+        intent={"zeus_test_url": r"C:\definitely-not-exist\logs"},
+        request_payload={"user_query": "why fail"},
+    )
+    assert out["valid"] is False
+    assert "local_path_not_found" in out["errors"]
+
+
+def test_input_validator_rejects_missing_template_resolved_local_path(monkeypatch):
+    monkeypatch.setattr(settings, "zeus_test_url_template", r"C:\logs\{matrix_id}\{test_id}")
+    v = InputValidator()
+    out = v.validate(
+        intent={"matrix_id": "40255", "test_id": "5894735"},
+        request_payload={"user_query": "why fail"},
+    )
+    assert out["valid"] is False
+    assert "local_path_not_found" in out["errors"]
+    assert out["resolved"]["effective_source"].endswith(r"40255\5894735")

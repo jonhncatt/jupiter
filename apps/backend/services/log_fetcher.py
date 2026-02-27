@@ -24,7 +24,7 @@ class LogFetcher:
     ) -> dict:
         explicit_source = bool((zeus_test_url or "").strip() or (matrix_id and test_id))
         meta = {
-            "source": "mock",
+            "source": "unresolved",
             "reason": "",
             "test_url": zeus_test_url,
             "files_count": 0,
@@ -48,10 +48,10 @@ class LogFetcher:
             )
         else:
             reason = "missing_matrix_or_test_or_url"
-            logger.warning("No matrix_id/test_id/test_url provided -> fallback mock log")
+            logger.warning("No matrix_id/test_id/test_url provided")
             meta.update({"reason": reason})
             meta["steps"].append({"step": "fetch.skip", "reason": reason})
-            return {"raw_log": _mock_log(), "meta": meta}
+            raise LogFetchError("No matrix_id/test_id/test_url provided")
 
         meta["test_url"] = test_url
         try:
@@ -85,12 +85,10 @@ class LogFetcher:
             files = extract_text_files(zip_bytes)
             if not files:
                 reason = "zip_has_no_text_files"
-                logger.warning("zip extracted no text files -> fallback mock log")
-                meta.update({"source": "mock", "reason": reason, "files_count": 0})
+                logger.warning("zip extracted no text files")
+                meta.update({"reason": reason, "files_count": 0})
                 meta["steps"].append({"step": "zip.extract", "status": "empty", "reason": reason})
-                if explicit_source:
-                    raise LogFetchError(f"Fetched zip but no supported text logs were found from source: {test_url}")
-                return {"raw_log": _mock_log(), "meta": meta}
+                raise LogFetchError(f"Fetched zip but no supported text logs were found from source: {test_url}")
             meta.update(
                 {
                     "reason": "ok",
@@ -107,14 +105,14 @@ class LogFetcher:
                 }
             )
             return {"raw_log": merge_texts(files), "meta": meta}
+        except LogFetchError:
+            raise
         except Exception as e:
             reason = f"fetch_failed:{e}"
-            logger.warning("fetch_raw_log failed: %s -> fallback mock", e)
-            meta.update({"source": "mock", "reason": reason})
+            logger.warning("fetch_raw_log failed: %s", e)
+            meta.update({"reason": reason})
             meta["steps"].append({"step": "fetch.failed", "reason": reason})
-            if explicit_source:
-                raise LogFetchError(f"Fetch failed for source `{test_url}`: {e}") from e
-            return {"raw_log": _mock_log(), "meta": meta}
+            raise LogFetchError(f"Fetch failed for source `{test_url}`: {e}") from e
 
     async def fetch_raw_log(
         self,
@@ -196,13 +194,3 @@ def _read_local_zip_bytes_detail(path_or_url: str) -> tuple[bytes, dict]:
 
     raise FileNotFoundError(f"Local path not found: {path}")
 
-
-def _mock_log() -> str:
-    return "\n".join(
-        [
-            "[INFO] test start: PCBasher Running",
-            "[WARN] latency spike detected",
-            "[ERROR] timeout waiting for controller ready (CSTS.RDY=0)",
-            "[INFO] end",
-        ]
-    )

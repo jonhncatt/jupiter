@@ -9,6 +9,7 @@ async def test_graph_runs(monkeypatch):
     from apps.backend.agents.tp_agent import TpAgent
     from apps.backend.agents.core_agent import CoreAgent
     from apps.backend.agents.intent_parser_agent import IntentParserAgent
+    from apps.backend.agents.fetch_agent import FetchAgent
     from apps.backend.core.models import ToolResult, Evidence
 
     async def fake_run(self, q, ctx):
@@ -23,13 +24,29 @@ async def test_graph_runs(monkeypatch):
     async def fake_intent(self, **kwargs):
         return {
             "sku": kwargs.get("sku"),
-            "matrix_id": kwargs.get("matrix_id"),
-            "test_id": kwargs.get("test_id"),
-            "zeus_test_url": kwargs.get("zeus_test_url"),
+            "matrix_id": "1",
+            "test_id": "2",
+            "zeus_test_url": None,
             "normalized_query": kwargs.get("user_query"),
             "source": "test",
             "confidence": 1.0,
             "notes": "test",
+        }
+
+    async def fake_fetch(self, *, sku, matrix_id, test_id, zeus_test_url):
+        return {
+            "raw_log": "[ERROR] timeout",
+            "fetch_meta": {
+                "agent": self.name,
+                "sku": sku,
+                "matrix_id": matrix_id,
+                "test_id": test_id,
+                "zeus_test_url": zeus_test_url,
+                "source": "test",
+                "reason": "ok",
+                "files_count": 1,
+                "steps": [{"step": "fetch.test"}],
+            },
         }
 
     monkeypatch.setattr(SpecAgent, "run", fake_run)
@@ -37,6 +54,7 @@ async def test_graph_runs(monkeypatch):
     monkeypatch.setattr(CoreAgent, "plan", fake_core)
     monkeypatch.setattr(CoreAgent, "finalize", fake_finalize)
     monkeypatch.setattr(IntentParserAgent, "run", fake_intent)
+    monkeypatch.setattr(FetchAgent, "run", fake_fetch)
 
     from apps.backend.services.log_parser import LogParser
     from apps.backend.services.input_validator import InputValidator

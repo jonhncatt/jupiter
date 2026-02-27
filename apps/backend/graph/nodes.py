@@ -1,6 +1,7 @@
 import asyncio
 import inspect
 import time
+from apps.backend.core.errors import InputValidationError
 from apps.backend.graph.state import GraphState
 from apps.backend.services.log_parser import LogParser
 from apps.backend.services.input_validator import InputValidator
@@ -129,6 +130,23 @@ def make_nodes(
                 "resolved": resolved,
             },
         )
+        if not validation.get("valid"):
+            msg = (
+                "Input validation failed: "
+                + ", ".join(validation.get("errors", []))
+                + (f" | warnings: {', '.join(validation.get('warnings', []))}" if validation.get("warnings") else "")
+            )
+            await _emit_event(
+                state,
+                "node.failed",
+                {
+                    "node": "validate",
+                    "run_id": state.get("run_id"),
+                    "status": "error",
+                    "error": msg[:500],
+                },
+            )
+            raise InputValidationError(msg)
         return {
             **state,
             "validation": validation,

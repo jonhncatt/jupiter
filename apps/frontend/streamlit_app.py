@@ -113,6 +113,7 @@ def render_result(data: Dict[str, Any]) -> None:
                 "status": "ok" if (raw.get("validation") or {}).get("valid") else "warn",
                 "detail": ",".join((raw.get("validation") or {}).get("errors", []))
                 or ",".join((raw.get("validation") or {}).get("warnings", []))
+                or ((raw.get("validation") or {}).get("resolved") or {}).get("effective_source")
                 or "ok",
             },
             {
@@ -335,6 +336,7 @@ if st.button("分析"):
             if state.get("done"):
                 if state.get("error"):
                     st.error(f"运行失败: {state['error']}")
+                    st.info("请检查并重新输入日志路径、matrix_id/test_id 或 Zeus URL，然后再次提交。")
                     st.stop()
                 result = state.get("result")
                 break

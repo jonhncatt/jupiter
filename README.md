@@ -392,7 +392,7 @@ ZEUS_COOKIE=...
 
 1. `IntentParserAgent(LLM)`：从自然语言解析 `sku/matrix_id/test_id/zeus_test_url`。  
 2. `InputValidator`：参数校验（必填、模板占位、格式），输出 `errors/warnings/resolved`。  
-3. `FetchAgent`：按校验后的参数下载或读取日志 zip（失败时自动 fallback mock，并记录 reason）。  
+3. `FetchAgent`：按校验后的参数下载或读取日志 zip；路径/链接错误时直接失败并要求重新输入。  
 4. `LogParser`：提取 `errors/warnings/highlights/tokens`。  
 5. `CoreAgent.plan`：决定专家路由与轮次提示。  
 6. `ExpertsOrchestrator`：并行调用专家：  
