@@ -75,6 +75,7 @@ show_debug_detail = st.checkbox("显示每一步详细数据（调试）", value
 
 def render_result(data: Dict[str, Any]) -> None:
     raw = data.get("raw") or {}
+    tool_results = data.get("tool_results", [])
     fetch_meta = (data.get("raw") or {}).get("fetch_meta") or {}
     if fetch_meta:
         st.subheader("Fetch 状态")
@@ -98,6 +99,49 @@ def render_result(data: Dict[str, Any]) -> None:
                 st.json(fetch_meta.get("steps", []))
             with st.expander("Fetch Meta 全量", expanded=False):
                 st.json(fetch_meta)
+
+    if show_debug_detail:
+        st.subheader("执行步骤总览")
+        step_rows = [
+            {
+                "step": "intent",
+                "status": "ok" if raw.get("intent") else "empty",
+                "detail": (raw.get("intent") or {}).get("source", ""),
+            },
+            {
+                "step": "validate",
+                "status": "ok" if (raw.get("validation") or {}).get("valid") else "warn",
+                "detail": ",".join((raw.get("validation") or {}).get("errors", []))
+                or ",".join((raw.get("validation") or {}).get("warnings", []))
+                or "ok",
+            },
+            {
+                "step": "fetch",
+                "status": fetch_meta.get("reason", ""),
+                "detail": fetch_meta.get("test_url") or fetch_meta.get("zip_url") or "",
+            },
+            {
+                "step": "parse",
+                "status": "ok" if raw.get("parsed") else "empty",
+                "detail": f"errors={len((raw.get('parsed') or {}).get('errors', []))}, warnings={len((raw.get('parsed') or {}).get('warnings', []))}",
+            },
+            {
+                "step": "plan",
+                "status": "ok" if raw.get("core_plan") else "empty",
+                "detail": str((raw.get("core_plan") or {}).get("selected_tools", [])),
+            },
+            {
+                "step": "experts",
+                "status": "ok" if tool_results else "empty",
+                "detail": ", ".join(f"{tr.get('tool')}:{tr.get('ok')}" for tr in tool_results),
+            },
+            {
+                "step": "finalize",
+                "status": "ok" if data.get("overall_summary") else "empty",
+                "detail": data.get("overall_summary", "")[:120],
+            },
+        ]
+        st.table(step_rows)
 
     st.subheader("总体结论")
     st.write(data["overall_summary"])
@@ -150,6 +194,17 @@ def render_result(data: Dict[str, Any]) -> None:
             st.code(raw_log[:6000] if raw_log else "(empty raw_log)")
         with st.expander("Graph Trace", expanded=False):
             st.json(raw.get("debug_trace", []))
+        with st.expander("专家交互细节", expanded=False):
+            expert_debug = [
+                {
+                    "tool": tr.get("tool"),
+                    "ok": tr.get("ok"),
+                    "summary": tr.get("summary"),
+                    "debug": tr.get("debug", {}),
+                }
+                for tr in tool_results
+            ]
+            st.json(expert_debug)
         with st.expander("完整 Raw 输出", expanded=False):
             st.json(raw)
 

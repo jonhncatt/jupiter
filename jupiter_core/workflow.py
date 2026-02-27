@@ -46,6 +46,22 @@ def _default_next_actions() -> list[str]:
     ]
 
 
+def _sanitize_for_response(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            str(k): _sanitize_for_response(v)
+            for k, v in value.items()
+            if not callable(v)
+        }
+    if isinstance(value, list):
+        return [_sanitize_for_response(v) for v in value]
+    if isinstance(value, tuple):
+        return [_sanitize_for_response(v) for v in value]
+    if callable(value):
+        return None
+    return value
+
+
 async def run_analysis(
     req: AnalyzeRequest,
     *,
@@ -103,6 +119,8 @@ async def run_analysis(
 
     summary_text = (out.get("final_summary") or out.get("draft_summary") or "").strip() or "（无总结）"
 
+    sanitized_raw = _sanitize_for_response(out)
+
     resp = AnalyzeResponse(
         request_id=req.request_id,
         overall_summary=summary_text,
@@ -111,7 +129,7 @@ async def run_analysis(
         tool_results=tool_results,
         recommendations=_guess_reco(summary_text),
         next_actions=_default_next_actions(),
-        raw=out,
+        raw=sanitized_raw,
     )
 
     if use_cache and cache is not None and event_callback is None:
