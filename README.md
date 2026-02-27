@@ -269,6 +269,7 @@ uvicorn apps.backend.main:app --host 0.0.0.0 --port 8000
 
 默认 `JUPITER_UI_MODE=api`（前端通过 FastAPI 调用）。  
 如果你想本地直连核心工作流（调试时更快），把 `.env` 里改成 `JUPITER_UI_MODE=local`。
+本地 `api` 模式建议 `JUPITER_BACKEND=http://127.0.0.1:8000`；Docker 下保持 `http://backend:8000`。
 
 ```bash
 streamlit run apps/frontend/streamlit_app.py --server.port 8502
@@ -304,7 +305,7 @@ streamlit run apps/frontend/streamlit_app.py --server.port 8502
 | `PIP_TRUSTED_HOST` | pip 信任主机（可多个，逗号分隔） | `pypi.org,files.pythonhosted.org,pypi.python.org` |
 | `CACHE_TTL_SECONDS` | 请求缓存秒数 | `600` |
 | `JUPITER_UI_MODE` | Streamlit 调用模式：`api` 或 `local` | `api` |
-| `JUPITER_BACKEND` | Streamlit 在 `api` 模式下的后端地址 | `http://backend:8000` |
+| `JUPITER_BACKEND` | Streamlit 在 `api` 模式下的后端地址（支持逗号分隔多地址，按顺序回退） | `http://127.0.0.1:8000,http://backend:8000` |
 
 ---
 

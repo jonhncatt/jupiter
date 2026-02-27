@@ -3,6 +3,7 @@ import time
 import asyncio
 import queue
 import threading
+from urllib.parse import urlparse
 from typing import Any, Dict
 
 import requests
@@ -12,13 +13,41 @@ from apps.backend.core.models import AnalyzeRequest, AnalyzeResponse
 from apps.backend.services.cache import TTLCache
 from jupiter_core.workflow import run_analysis
 
-BACKEND = os.getenv("JUPITER_BACKEND", "http://backend:8000")
+BACKEND = os.getenv("JUPITER_BACKEND", "http://127.0.0.1:8000")
 UI_MODE = os.getenv("JUPITER_UI_MODE", "api").strip().lower()
 _LOCAL_CACHE = TTLCache(ttl_seconds=600)
 
+
+def backend_candidates(raw: str) -> list[str]:
+    vals = [x.strip().rstrip("/") for x in (raw or "").split(",") if x.strip()]
+    if not vals:
+        vals = ["http://127.0.0.1:8000"]
+    has_compose_host = any(urlparse(v).hostname == "backend" for v in vals)
+    if has_compose_host:
+        for fallback in ("http://127.0.0.1:8000", "http://localhost:8000"):
+            if fallback not in vals:
+                vals.append(fallback)
+    return vals
+
+
+BACKEND_CANDIDATES = backend_candidates(BACKEND)
+
+
+def api_request_json(method: str, path: str, *, payload: Dict[str, Any] | None = None, timeout: int = 30) -> tuple[Dict[str, Any], str]:
+    errs: list[str] = []
+    for base in BACKEND_CANDIDATES:
+        url = f"{base}{path}"
+        try:
+            resp = requests.request(method, url, json=payload, timeout=timeout)
+            resp.raise_for_status()
+            return resp.json(), base
+        except Exception as e:
+            errs.append(f"{base}: {e}")
+    raise RuntimeError(" ; ".join(errs))
+
 st.set_page_config(page_title="Jupiter", layout="wide")
 st.title("Jupiter - Multi-Agent Log Analysis")
-st.caption(f"UI mode: `{UI_MODE}`")
+st.caption(f"UI mode: `{UI_MODE}` | backend candidates: `{', '.join(BACKEND_CANDIDATES)}`")
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -147,15 +176,13 @@ if st.button("分析"):
         render_result(data)
     elif use_run_api:
         try:
-            r = requests.post(f"{BACKEND}/api/runs", json=payload, timeout=30)
-            r.raise_for_status()
-            run = r.json()
+            run, chosen_backend = api_request_json("POST", "/api/runs", payload=payload, timeout=30)
         except Exception as e:
             st.error(f"启动运行失败: {e}")
             st.stop()
 
         run_id = run["run_id"]
-        st.info(f"run_id: {run_id}")
+        st.info(f"run_id: {run_id} | backend: {chosen_backend}")
         status_box = st.empty()
         timeline_box = st.empty()
         event_lines: list[str] = []
@@ -164,7 +191,7 @@ if st.button("分析"):
 
         for _ in range(360):  # up to ~6 minutes
             try:
-                rr = requests.get(f"{BACKEND}/api/runs/{run_id}", timeout=30)
+                rr = requests.get(f"{chosen_backend}/api/runs/{run_id}", timeout=30)
                 rr.raise_for_status()
                 state = rr.json()
             except Exception as e:
@@ -196,9 +223,7 @@ if st.button("分析"):
         render_result(result)
     else:
         try:
-            r = requests.post(f"{BACKEND}/api/analyze", json=payload, timeout=180)
-            r.raise_for_status()
-            data = r.json()
+            data, _ = api_request_json("POST", "/api/analyze", payload=payload, timeout=180)
         except Exception as e:
             st.error(f"调用后端失败: {e}")
             st.stop()
