@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     openai_model: str = Field(default="gpt-4o-mini", alias="OPENAI_MODEL")
     openai_temperature: str = Field(default="", alias="OPENAI_TEMPERATURE")
     openai_intent_temperature: str = Field(default="", alias="OPENAI_INTENT_TEMPERATURE")
+    openai_plan_temperature: str = Field(default="", alias="OPENAI_PLAN_TEMPERATURE")
     openai_finalize_temperature: str = Field(default="", alias="OPENAI_FINALIZE_TEMPERATURE")
     officetool_ca_cert_path: str = Field(default="", alias="OFFICETOOL_CA_CERT_PATH")
     offciatool_ca_cert_path: str = Field(default="", alias="OFFCIATOOL_CA_CERT_PATH")

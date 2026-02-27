@@ -333,6 +333,7 @@ Windows（不激活 venv 的直接启动方式）：
 | `OPENAI_MODEL` | 总结模型 | `gpt-4o-mini` |
 | `OPENAI_TEMPERATURE` | 全局温度；若 Azure/兼容部署不支持 temperature，保持为空 | `` |
 | `OPENAI_INTENT_TEMPERATURE` | IntentParser 温度；不支持 temperature 的部署请留空 | `` |
+| `OPENAI_PLAN_TEMPERATURE` | Planner 温度；建议低温，若部署不支持 temperature 请留空 | `` |
 | `OPENAI_FINALIZE_TEMPERATURE` | Finalize 温度；不支持 temperature 的部署请留空 | `` |
 | `OFFICETOOL_CA_CERT_PATH` | 内网根证书路径（非常重要） | `/certs/CompanyInternalRootCA.cer` |
 | `COMPANY_CA_CERT_FILENAME` | Docker 构建时注入到镜像信任链的证书文件名（位于 `certs/`） | `CompanyInternalRootCA.cer` |
@@ -396,7 +397,7 @@ ZEUS_COOKIE=...
 2. `InputValidator`：参数校验（必填、模板占位、格式），输出 `errors/warnings/resolved`。  
 3. `FetchAgent`：按校验后的参数下载或读取日志 zip；路径/链接错误时直接失败并要求重新输入。  
 4. `LogParser`：提取 `errors/warnings/highlights/tokens`。  
-5. `CoreAgent.plan`：决定专家路由与轮次提示。  
+5. `CoreAgent.plan`：优先走 LLM planner 生成专家路由与定制任务；若 LLM 输出异常，则回退到规则 planner。  
 6. `ExpertsOrchestrator`：并行调用专家：  
    - `6-1 Spec Expert Agent`（Dify Spec App）  
    - `6-2 TP Expert Agent`（Dify TP App）  
@@ -429,6 +430,7 @@ ZEUS_COOKIE=...
   - 约束 `CoreAgent` 先分析，再按需给每个 expert 下发不同任务
   - 约束 `Spec/TP/Jira` 各自遵循固定分析习惯
   - 避免把用户原始问题直接广播给所有 expert
+- 当前 `CoreAgent.plan` 已升级为 `LLM planner + 规则兜底`
 
 ---
 

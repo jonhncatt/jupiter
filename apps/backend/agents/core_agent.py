@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 from typing import Any, Dict, List
@@ -24,6 +25,31 @@ SYSTEM_FINALIZE = """你是SSD测试日志分析的总控专家（Core Agent Fin
 5. 下一步动作（补充信息与复现方案）
 要求：证据导向，避免空话；若信息不足明确指出缺口。"""
 
+SYSTEM_PLAN = """你是SSD测试日志分析的总控规划器（Core Agent Planner）。
+你需要决定：
+1) 是否需要调用 spec / tp / jira expert
+2) 为什么调用
+3) 给每个 expert 下发什么定制任务
+
+只输出 JSON：
+{
+  "selected_tools": ["spec", "tp", "jira"],
+  "reason": "string",
+  "round_hint": 1,
+  "expert_queries": {
+    "spec": "string",
+    "tp": "string",
+    "jira": "string"
+  }
+}
+
+约束：
+- selected_tools 只能使用 spec/tp/jira
+- 如果用户明确要求只总结，则 selected_tools 必须为空
+- 不要把用户原始问题原封不动复制给所有 expert
+- expert_queries 必须是针对各 expert 的具体任务
+- 只返回 JSON，不要额外文本"""
+
 
 class CoreAgent:
     """
@@ -35,6 +61,18 @@ class CoreAgent:
     name = "core_agent(orchestrator)"
 
     async def plan(self, query: str, parsed: Dict[str, Any], raw_log: str = "") -> Dict[str, Any]:
+        rules_plan = self._rules_plan(query, parsed, raw_log=raw_log)
+        if not self._llm_available():
+            rules_plan["planner_source"] = "rules"
+            return rules_plan
+
+        llm_plan = self._llm_plan(query, parsed, rules_plan)
+        if llm_plan is None:
+            rules_plan["planner_source"] = "rules_fallback"
+            return rules_plan
+        return llm_plan
+
+    def _rules_plan(self, query: str, parsed: Dict[str, Any], raw_log: str = "") -> Dict[str, Any]:
         q = (query or "").lower()
         tokens = (parsed or {}).get("tokens") or {}
         highlights = (parsed or {}).get("highlights") or []
@@ -45,7 +83,7 @@ class CoreAgent:
         selected_tools: List[str] = []
         reasons: List[str] = []
 
-        wants_summary_only = any(k in q for k in ["只总结", "仅总结", "summary only", "no rag"])
+        wants_summary_only = _is_summary_only(q)
 
         needs_spec = any(
             k in q
@@ -131,7 +169,89 @@ class CoreAgent:
             "need_rag": bool(selected_tools),
             "round_hint": 2,  # downstream expert agents can use this as max rounds hint
             "expert_queries": expert_queries,
+            "planner_source": "rules",
         }
+
+    def _llm_plan(self, query: str, parsed: Dict[str, Any], rules_plan: Dict[str, Any]) -> Dict[str, Any] | None:
+        user = self._build_llm_plan_input(query=query, parsed=parsed, rules_plan=rules_plan)
+        try:
+            temperature = settings.openai_plan_temperature or settings.openai_temperature or None
+            raw = chat(SYSTEM_PLAN + "\n\n" + CORE_AGENT_PLAYBOOK.strip(), user, temperature=temperature)
+        except Exception as e:
+            logger.warning("Core planner LLM failed: %s", e)
+            return None
+
+        obj = _parse_json_object(raw)
+        if not isinstance(obj, dict):
+            logger.warning("Core planner LLM returned non-JSON: %s", (raw or "")[:300])
+            return None
+
+        selected_tools = _sanitize_tools(obj.get("selected_tools"))
+        reason = str(obj.get("reason") or "").strip()
+        round_hint = _sanitize_round_hint(obj.get("round_hint"))
+        expert_queries = obj.get("expert_queries") if isinstance(obj.get("expert_queries"), dict) else {}
+
+        if _is_summary_only((query or "").lower()) and selected_tools:
+            # Respect explicit summary-only cases or hard rule skips.
+            selected_tools = []
+
+        merged_expert_queries = dict(rules_plan.get("expert_queries", {}))
+        for tool in selected_tools:
+            val = expert_queries.get(tool)
+            if isinstance(val, str) and val.strip():
+                merged_expert_queries[tool] = val.strip()
+        # Ensure every selected tool has a concrete query.
+        for tool in list(selected_tools):
+            if not merged_expert_queries.get(tool):
+                merged_expert_queries[tool] = rules_plan.get("expert_queries", {}).get(tool, "")
+        if any(not merged_expert_queries.get(tool) for tool in selected_tools):
+            logger.warning("Core planner LLM missing expert queries: %s", selected_tools)
+            return None
+
+        return {
+            "selected_tools": selected_tools,
+            "reason": reason or rules_plan.get("reason", ""),
+            "core_playbook": CORE_AGENT_PLAYBOOK.strip(),
+            "need_rag": bool(selected_tools),
+            "round_hint": round_hint,
+            "expert_queries": {tool: merged_expert_queries[tool] for tool in selected_tools},
+            "planner_source": "llm",
+            "planner_raw_preview": (raw or "")[:800],
+            "rules_plan_fallback": {
+                "selected_tools": rules_plan.get("selected_tools", []),
+                "reason": rules_plan.get("reason", ""),
+            },
+        }
+
+    def _build_llm_plan_input(self, *, query: str, parsed: Dict[str, Any], rules_plan: Dict[str, Any]) -> str:
+        domain = parsed.get("domain_context") or {}
+        pcb = domain.get("pcb_console") or {}
+        nvmecore = domain.get("nvmecore") or {}
+        lines: List[str] = []
+        lines.append("【用户问题】")
+        lines.append(query)
+        lines.append("\n【规则基线建议】")
+        lines.append(json.dumps(
+            {
+                "selected_tools": rules_plan.get("selected_tools", []),
+                "reason": rules_plan.get("reason", ""),
+                "expert_queries": rules_plan.get("expert_queries", {}),
+            },
+            ensure_ascii=False,
+        ))
+        lines.append("\n【Parser tokens】")
+        lines.append(json.dumps(parsed.get("tokens", {}), ensure_ascii=False))
+        lines.append("\n【关键高亮】")
+        lines.extend((parsed.get("highlights") or [])[:12])
+        lines.append("\n【PCB console】")
+        lines.append(json.dumps(pcb, ensure_ascii=False))
+        lines.append("\n【nvmecore】")
+        lines.append(json.dumps({"command_lines": nvmecore.get("command_lines", [])[:12]}, ensure_ascii=False))
+        return "\n".join(lines)
+
+    def _llm_available(self) -> bool:
+        key = (settings.openai_api_key or "").strip()
+        return bool(key and key != "CHANGE_ME")
 
     def _build_expert_queries(
         self,
@@ -205,6 +325,7 @@ class CoreAgent:
         lines.append(
             f"need_rag={core_plan.get('need_rag')} selected_tools={core_plan.get('selected_tools', [])}"
         )
+        lines.append(f"planner_source={core_plan.get('planner_source', 'unknown')}")
         lines.append(f"reason={core_plan.get('reason', '')}")
         if core_plan.get("expert_queries"):
             lines.append("expert_queries=" + str(core_plan.get("expert_queries")))
@@ -235,3 +356,46 @@ class CoreAgent:
     # Backward-compatible alias
     async def run(self, query: str, parsed: Dict[str, Any]) -> Dict[str, Any]:
         return await self.plan(query, parsed)
+
+
+def _parse_json_object(raw: str) -> Dict[str, Any] | None:
+    if not raw:
+        return None
+    text = raw.strip()
+    try:
+        obj = json.loads(text)
+        return obj if isinstance(obj, dict) else None
+    except Exception:
+        pass
+    m = re.search(r"\{.*\}", text, re.S)
+    if not m:
+        return None
+    try:
+        obj = json.loads(m.group(0))
+        return obj if isinstance(obj, dict) else None
+    except Exception:
+        return None
+
+
+def _sanitize_tools(value: Any) -> List[str]:
+    allowed = {"spec", "tp", "jira"}
+    out: List[str] = []
+    if not isinstance(value, list):
+        return out
+    for item in value:
+        tool = str(item).strip().lower()
+        if tool in allowed and tool not in out:
+            out.append(tool)
+    return out
+
+
+def _sanitize_round_hint(value: Any) -> int:
+    try:
+        num = int(value)
+    except Exception:
+        return 2
+    return max(1, min(num, 3))
+
+
+def _is_summary_only(q: str) -> bool:
+    return any(k in q for k in ["只总结", "仅总结", "summary only", "no rag"])

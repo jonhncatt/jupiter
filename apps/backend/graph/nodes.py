@@ -278,6 +278,7 @@ def make_nodes(
             {
                 "node": "core_plan",
                 "duration_ms": round((time.perf_counter() - t0) * 1000, 2),
+                "planner_source": plan.get("planner_source", "unknown"),
                 "selected_tools": plan.get("selected_tools", []),
                 "reason": plan.get("reason", ""),
             },
@@ -290,6 +291,7 @@ def make_nodes(
                 "run_id": state.get("run_id"),
                 "status": "ok",
                 "duration_ms": trace[-1]["duration_ms"],
+                "planner_source": trace[-1]["planner_source"],
                 "selected_tools": trace[-1]["selected_tools"],
                 "reason": trace[-1]["reason"],
             },
