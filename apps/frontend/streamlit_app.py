@@ -3,15 +3,21 @@ import time
 import asyncio
 import queue
 import threading
+from pathlib import Path
 from urllib.parse import urlparse
 from typing import Any, Dict
 
 import requests
 import streamlit as st
+from dotenv import load_dotenv
 
 from apps.backend.core.models import AnalyzeRequest, AnalyzeResponse
 from apps.backend.services.cache import TTLCache
 from jupiter_core.workflow import run_analysis
+
+# Load project .env for local runs (docker env vars still take precedence).
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(PROJECT_ROOT / ".env", override=False)
 
 BACKEND = os.getenv("JUPITER_BACKEND", "http://127.0.0.1:8000")
 UI_MODE = os.getenv("JUPITER_UI_MODE", "api").strip().lower()
