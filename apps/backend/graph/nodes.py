@@ -48,7 +48,7 @@ def make_nodes(
         await _emit_event(
             state,
             "node.started",
-            {"node": "intent", "run_id": state.get("run_id")},
+            {"node": "intent", "run_id": state.get("run_id"), "status": "started"},
         )
         intent = await intent_parser.run(
             user_query=state.get("user_query", ""),
@@ -75,6 +75,7 @@ def make_nodes(
             {
                 "node": "intent",
                 "run_id": state.get("run_id"),
+                "status": "ok",
                 "duration_ms": trace[-1]["duration_ms"],
                 "source": trace[-1]["source"],
                 "sku": trace[-1]["sku"],
@@ -90,7 +91,7 @@ def make_nodes(
         await _emit_event(
             state,
             "node.started",
-            {"node": "validate", "run_id": state.get("run_id")},
+            {"node": "validate", "run_id": state.get("run_id"), "status": "started"},
         )
         validation = validator.validate(
             state.get("intent", {}),
@@ -120,6 +121,7 @@ def make_nodes(
             {
                 "node": "validate",
                 "run_id": state.get("run_id"),
+                "status": "ok" if validation.get("valid") else "warn",
                 "duration_ms": trace[-1]["duration_ms"],
                 "valid": validation.get("valid"),
                 "errors": validation.get("errors", []),
@@ -143,7 +145,7 @@ def make_nodes(
         await _emit_event(
             state,
             "node.started",
-            {"node": "fetch", "run_id": state.get("run_id")},
+            {"node": "fetch", "run_id": state.get("run_id"), "status": "started"},
         )
         fetched = await fetch_agent.run(
             sku=state.get("sku"),
@@ -166,6 +168,7 @@ def make_nodes(
             {
                 "node": "fetch",
                 "run_id": state.get("run_id"),
+                "status": "ok" if fetched.get("fetch_meta", {}).get("reason") == "ok" else "warn",
                 "duration_ms": trace[-1]["duration_ms"],
                 "raw_log_chars": trace[-1]["raw_log_chars"],
                 "source": fetched.get("fetch_meta", {}).get("source", "-"),
@@ -185,7 +188,7 @@ def make_nodes(
         await _emit_event(
             state,
             "node.started",
-            {"node": "parse", "run_id": state.get("run_id")},
+            {"node": "parse", "run_id": state.get("run_id"), "status": "started"},
         )
         p = parser.parse(state["raw_log"])
         parsed = {
@@ -210,6 +213,7 @@ def make_nodes(
             {
                 "node": "parse",
                 "run_id": state.get("run_id"),
+                "status": "ok",
                 "duration_ms": trace[-1]["duration_ms"],
                 "errors": trace[-1]["errors"],
                 "warnings": trace[-1]["warnings"],
@@ -225,7 +229,7 @@ def make_nodes(
         await _emit_event(
             state,
             "node.started",
-            {"node": "core_plan", "run_id": state.get("run_id")},
+            {"node": "core_plan", "run_id": state.get("run_id"), "status": "started"},
         )
         plan = await core.plan(
             state["user_query"],
@@ -247,6 +251,7 @@ def make_nodes(
             {
                 "node": "core_plan",
                 "run_id": state.get("run_id"),
+                "status": "ok",
                 "duration_ms": trace[-1]["duration_ms"],
                 "selected_tools": trace[-1]["selected_tools"],
                 "reason": trace[-1]["reason"],
@@ -259,7 +264,7 @@ def make_nodes(
         await _emit_event(
             state,
             "node.started",
-            {"node": "experts", "run_id": state.get("run_id")},
+            {"node": "experts", "run_id": state.get("run_id"), "status": "started"},
         )
         plan = state.get("core_plan", {})
         selected = plan.get("selected_tools", []) or []
@@ -344,6 +349,7 @@ def make_nodes(
             {
                 "node": "experts",
                 "run_id": state.get("run_id"),
+                "status": "ok" if all(r.ok for r in tool_results) else "warn",
                 "duration_ms": trace[-1]["duration_ms"],
                 "selected_tools": trace[-1]["selected_tools"],
                 "results": trace[-1]["results"],
@@ -356,7 +362,7 @@ def make_nodes(
         await _emit_event(
             state,
             "node.started",
-            {"node": "finalize", "run_id": state.get("run_id")},
+            {"node": "finalize", "run_id": state.get("run_id"), "status": "started"},
         )
         final_summary = await core.finalize(
             query=state["user_query"],
@@ -379,6 +385,7 @@ def make_nodes(
             {
                 "node": "finalize",
                 "run_id": state.get("run_id"),
+                "status": "ok",
                 "duration_ms": trace[-1]["duration_ms"],
                 "summary_chars": trace[-1]["summary_chars"],
             },

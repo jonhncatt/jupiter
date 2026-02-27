@@ -216,7 +216,14 @@ def event_to_line(evt: Dict[str, Any]) -> str:
     target = payload.get("agent") or payload.get("node") or "-"
     status = payload.get("status") or ("ok" if payload.get("ok") is True else ("fail" if payload.get("ok") is False else "-"))
     info = payload.get("summary") or payload.get("reason") or payload.get("error") or ""
-    return f"[{seq}] {typ:<16} target={target:<20} status={status:<8} {info}"
+    icon = {
+        "started": "...",
+        "ok": "OK",
+        "warn": "WARN",
+        "error": "ERR",
+        "fail": "ERR",
+    }.get(str(status).lower(), "--")
+    return f"[{seq}] {icon:<4} {typ:<16} target={target:<20} status={status:<8} {info}"
 
 
 def run_async(coro):
