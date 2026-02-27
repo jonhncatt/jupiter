@@ -72,6 +72,8 @@ def make_nodes(
                 "source": fetched.get("fetch_meta", {}).get("source", "-"),
                 "reason": fetched.get("fetch_meta", {}).get("reason", ""),
                 "files_count": fetched.get("fetch_meta", {}).get("files_count", 0),
+                "test_url": fetched.get("fetch_meta", {}).get("test_url"),
+                "top_files": fetched.get("fetch_meta", {}).get("top_files", []),
             },
         )
         return {**state, **fetched, "debug_trace": trace}
@@ -110,6 +112,8 @@ def make_nodes(
                 "errors": trace[-1]["errors"],
                 "warnings": trace[-1]["warnings"],
                 "highlights": trace[-1]["highlights"],
+                "tokens": parsed.get("tokens", {}),
+                "sample_errors": parsed.get("errors", [])[:3],
             },
         )
         return {**state, "parsed": parsed, "debug_trace": trace}

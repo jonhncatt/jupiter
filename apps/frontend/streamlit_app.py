@@ -70,9 +70,11 @@ user_query = st.text_area(
 )
 zeus_test_url = st.text_input("可选：直接填写 Zeus test URL/本地目录路径（覆盖 sku/matrix/test 拼接）", value="")
 use_run_api = st.checkbox("实时显示多Agent轨迹（推荐）", value=True)
+show_debug_detail = st.checkbox("显示每一步详细数据（调试）", value=True)
 
 
 def render_result(data: Dict[str, Any]) -> None:
+    raw = data.get("raw") or {}
     fetch_meta = (data.get("raw") or {}).get("fetch_meta") or {}
     if fetch_meta:
         st.subheader("Fetch 状态")
@@ -110,8 +112,29 @@ def render_result(data: Dict[str, Any]) -> None:
     for x in data.get("next_actions", []):
         st.write(f"- {x}")
 
-    with st.expander("调试数据（raw）", expanded=False):
-        st.json(data.get("raw", {}))
+    if show_debug_detail:
+        st.subheader("步骤细节（Debug）")
+        with st.expander("Core 路由决策", expanded=False):
+            st.json(raw.get("core_plan", {}))
+        with st.expander("Parser 输出", expanded=False):
+            parsed = raw.get("parsed", {})
+            st.write(f"- errors: {len(parsed.get('errors', []))}")
+            st.write(f"- warnings: {len(parsed.get('warnings', []))}")
+            st.write(f"- highlights: {len(parsed.get('highlights', []))}")
+            st.write(f"- tokens: {parsed.get('tokens', {})}")
+            st.write("sample errors:")
+            for line in parsed.get("errors", [])[:10]:
+                st.write(f"- {line}")
+            st.write("sample highlights:")
+            for line in parsed.get("highlights", [])[:10]:
+                st.write(f"- {line}")
+        with st.expander("Raw Log 预览", expanded=False):
+            raw_log = raw.get("raw_log", "")
+            st.code(raw_log[:6000] if raw_log else "(empty raw_log)")
+        with st.expander("Graph Trace", expanded=False):
+            st.json(raw.get("debug_trace", []))
+        with st.expander("完整 Raw 输出", expanded=False):
+            st.json(raw)
 
 
 def event_to_line(evt: Dict[str, Any]) -> str:
@@ -147,7 +170,7 @@ def run_async(coro):
     raise payload
 
 
-def run_local(payload: Dict[str, Any], timeline_box) -> Dict[str, Any]:
+def run_local(payload: Dict[str, Any], timeline_box) -> tuple[Dict[str, Any], list[Dict[str, Any]]]:
     req = AnalyzeRequest(**payload)
     events: list[Dict[str, Any]] = []
     event_lines: list[str] = []
@@ -166,7 +189,7 @@ def run_local(payload: Dict[str, Any], timeline_box) -> Dict[str, Any]:
             cache=_LOCAL_CACHE,
         )
     )
-    return result.model_dump(mode="json")
+    return result.model_dump(mode="json"), events
 
 
 if st.button("分析"):
@@ -186,11 +209,14 @@ if st.button("分析"):
         timeline_box = st.empty()
         timeline_box.code("local workflow running...")
         try:
-            data = run_local(payload, timeline_box)
+            data, local_events = run_local(payload, timeline_box)
         except Exception as e:
             st.error(f"本地模式运行失败: {e}")
             st.stop()
         render_result(data)
+        if show_debug_detail:
+            with st.expander("事件明细（local）", expanded=False):
+                st.json(local_events)
     elif use_run_api:
         try:
             run, chosen_backend = api_request_json("POST", "/api/runs", payload=payload, timeout=30)
@@ -203,6 +229,7 @@ if st.button("分析"):
         status_box = st.empty()
         timeline_box = st.empty()
         event_lines: list[str] = []
+        event_details: list[Dict[str, Any]] = []
         seen_seq = 0
         result: Dict[str, Any] | None = None
 
@@ -223,6 +250,7 @@ if st.button("分析"):
             for evt in new_events:
                 seen_seq = max(seen_seq, int(evt.get("seq", 0)))
                 event_lines.append(event_to_line(evt))
+                event_details.append(evt)
             timeline_box.code("\n".join(event_lines[-120:]) if event_lines else "等待事件...")
 
             if state.get("done"):
@@ -238,6 +266,9 @@ if st.button("分析"):
             st.stop()
 
         render_result(result)
+        if show_debug_detail:
+            with st.expander("事件明细（api/runs）", expanded=False):
+                st.json(event_details)
     else:
         try:
             data, _ = api_request_json("POST", "/api/analyze", payload=payload, timeout=180)
