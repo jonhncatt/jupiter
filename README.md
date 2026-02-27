@@ -244,6 +244,13 @@ py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
+如果 PowerShell 不允许执行 `Activate.ps1`，可跳过激活，直接用 `.venv` 里的 Python：
+
+```powershell
+cd C:\Users\yourname\openaicdx\jupiter
+.\.venv\Scripts\python.exe -m pip install -e .
+```
+
 2. 在虚拟环境中安装依赖
 
 ```bash
@@ -273,6 +280,16 @@ uvicorn apps.backend.main:app --host 0.0.0.0 --port 8000
 
 ```bash
 streamlit run apps/frontend/streamlit_app.py --server.port 8502
+```
+
+Windows（不激活 venv 的直接启动方式）：
+
+```powershell
+# 终端1：后端
+.\.venv\Scripts\python.exe -m uvicorn apps.backend.main:app --host 0.0.0.0 --port 8000
+
+# 终端2：前端
+.\.venv\Scripts\python.exe -m streamlit run apps/frontend/streamlit_app.py --server.port 8502
 ```
 
 6. 访问地址
