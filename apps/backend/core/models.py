@@ -24,6 +24,7 @@ class ToolResult(BaseModel):
     ok: bool
     summary: str
     evidences: List[Evidence] = Field(default_factory=list)
+    debug: Dict[str, Any] = Field(default_factory=dict)
 
 
 class AnalyzeResponse(BaseModel):

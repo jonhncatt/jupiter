@@ -266,6 +266,34 @@ curl -X POST http://localhost:8000/api/analyze \
   }'
 ```
 
+实时多 Agent 轨迹（推荐）：
+
+1. 启动一次 run：
+
+```bash
+curl -X POST http://localhost:8000/api/runs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "request_id": "req-rt-001",
+    "user_query": "分析这个用例失败原因",
+    "sku": "NX1",
+    "matrix_id": "40255",
+    "test_id": "5894735"
+  }'
+```
+
+2. 查状态和结果：
+
+```bash
+curl http://localhost:8000/api/runs/<run_id>
+```
+
+3. 订阅事件流（SSE）：
+
+```bash
+curl -N http://localhost:8000/api/runs/<run_id>/events
+```
+
 ---
 
 ## 11. 测试与开发
