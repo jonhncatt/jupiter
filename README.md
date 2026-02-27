@@ -120,6 +120,12 @@ PIP_INDEX_URL=https://<your-internal-pypi>/simple
 PIP_TRUSTED_HOST=<your-internal-pypi-host>
 ```
 
+也可配置多个 trusted host（逗号分隔）：
+
+```env
+PIP_TRUSTED_HOST=pypi.org,files.pythonhosted.org,pypi.python.org
+```
+
 4. 重新构建：
 
 ```bash
@@ -185,7 +191,7 @@ streamlit run apps/frontend/streamlit_app.py --server.port 8502
 | `COMPANY_CA_CERT_FILENAME` | Docker 构建时注入到镜像信任链的证书文件名（位于 `certs/`） | `CompanyInternalRootCA.cer` |
 | `PIP_INDEX_URL` | Docker 构建使用的 Python 包源（内网环境可指向私有镜像） | `https://pypi.example.com/simple` |
 | `PIP_EXTRA_INDEX_URL` | 额外 Python 包源 | `https://extra.example.com/simple` |
-| `PIP_TRUSTED_HOST` | pip 信任主机（证书策略严格时使用） | `pypi.example.com` |
+| `PIP_TRUSTED_HOST` | pip 信任主机（可多个，逗号分隔） | `pypi.org,files.pythonhosted.org,pypi.python.org` |
 | `CACHE_TTL_SECONDS` | 请求缓存秒数 | `600` |
 
 ---

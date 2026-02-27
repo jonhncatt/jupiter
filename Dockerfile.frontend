@@ -12,8 +12,7 @@ RUN if [ -n "$COMPANY_CA_CERT_FILENAME" ] && [ -f "/tmp/certs/$COMPANY_CA_CERT_F
     fi
 
 RUN if [ -n "$PIP_INDEX_URL" ]; then pip config set global.index-url "$PIP_INDEX_URL"; fi \
-    && if [ -n "$PIP_EXTRA_INDEX_URL" ]; then pip config set global.extra-index-url "$PIP_EXTRA_INDEX_URL"; fi \
-    && if [ -n "$PIP_TRUSTED_HOST" ]; then pip config set global.trusted-host "$PIP_TRUSTED_HOST"; fi
+    && if [ -n "$PIP_EXTRA_INDEX_URL" ]; then pip config set global.extra-index-url "$PIP_EXTRA_INDEX_URL"; fi
 
 COPY pyproject.toml /app/pyproject.toml
 RUN if [ -n "$COMPANY_CA_CERT_FILENAME" ] && [ -f "/tmp/certs/$COMPANY_CA_CERT_FILENAME" ]; then \
@@ -21,7 +20,13 @@ RUN if [ -n "$COMPANY_CA_CERT_FILENAME" ] && [ -f "/tmp/certs/$COMPANY_CA_CERT_F
       export SSL_CERT_FILE="/tmp/certs/$COMPANY_CA_CERT_FILENAME"; \
       export REQUESTS_CA_BUNDLE="/tmp/certs/$COMPANY_CA_CERT_FILENAME"; \
     fi; \
-    pip install --no-cache-dir -U pip && pip install --no-cache-dir -e .
+    TRUSTED_ARGS=""; \
+    if [ -n "$PIP_TRUSTED_HOST" ]; then \
+      for host in $(echo "$PIP_TRUSTED_HOST" | tr ',;' '  '); do \
+        if [ -n "$host" ]; then TRUSTED_ARGS="$TRUSTED_ARGS --trusted-host $host"; fi; \
+      done; \
+    fi; \
+    pip install --no-cache-dir -U pip $TRUSTED_ARGS && pip install --no-cache-dir -e . $TRUSTED_ARGS
 COPY apps /app/apps
 EXPOSE 8501
 CMD ["streamlit", "run", "apps/frontend/streamlit_app.py", "--server.address=0.0.0.0", "--server.port=8501"]
