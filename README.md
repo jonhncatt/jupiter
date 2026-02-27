@@ -17,8 +17,9 @@ Jupiter 是一个面向 SSD/NVMe 测试分析的后端系统：
 
 ```mermaid
 flowchart LR
-UI["Streamlit"] --> API["FastAPI /api/analyze"]
-API --> G["LangGraph Workflow"]
+UI["Streamlit"] --> CORE["jupiter_core.run_analysis"]
+API["FastAPI /api/analyze"] --> CORE
+CORE --> G["LangGraph Workflow"]
 
 G --> F["FetchAgent"]
 F --> Z["ZeusPortalClient"]
@@ -37,6 +38,93 @@ G --> C2["CoreAgent.finalize"]
 C2 --> L["OpenAI-compatible LLM"]
 L --> R["AnalyzeResponse"]
 R --> UI
+R --> API
+```
+
+### 2.1 概念图1：模块调用关系（谁负责什么）
+
+```mermaid
+flowchart TB
+REQ["用户输入 (sku/matrix/test/query)"] --> ENTRY{"入口"}
+ENTRY -->|UI 模式=api| FE["Streamlit"]
+ENTRY -->|API 调用| API["FastAPI"]
+ENTRY -->|UI 模式=local| FELOCAL["Streamlit(local)"]
+
+FE --> API
+API --> WF["jupiter_core.run_analysis"]
+FELOCAL --> WF
+
+WF --> FETCH["FetchAgent + LogFetcher"]
+FETCH --> ZEUS["ZeusPortalClient / 本地路径读取zip"]
+WF --> PARSE["LogParser"]
+WF --> COREPLAN["CoreAgent.plan (路由决策)"]
+COREPLAN --> SPEC["SpecAgent -> Dify Spec App"]
+COREPLAN --> TP["TpAgent -> Dify TP App"]
+COREPLAN --> JIRA["JiraAgent -> Dify Jira App"]
+SPEC --> DIFY["Dify /v1/chat-messages"]
+TP --> DIFY
+JIRA --> DIFY
+WF --> FINAL["CoreAgent.finalize -> OpenAI-compatible LLM"]
+FINAL --> RESP["AnalyzeResponse (摘要/根因/证据/建议)"]
+```
+
+### 2.2 概念图2：单次请求时序（谁调用了谁）
+
+```mermaid
+sequenceDiagram
+participant U as User
+participant S as Streamlit
+participant A as FastAPI
+participant W as jupiter_core.run_analysis
+participant F as FetchAgent/LogFetcher
+participant Z as Zeus(or local zip)
+participant P as LogParser
+participant C as CoreAgent.plan
+participant SP as SpecAgent(Dify)
+participant TP as TpAgent(Dify)
+participant J as JiraAgent(Dify)
+participant L as CoreAgent.finalize+LLM
+
+U->>S: 点击「分析」
+alt UI_MODE=api
+  S->>A: POST /api/runs 或 /api/analyze
+  A->>W: run_analysis(req)
+else UI_MODE=local
+  S->>W: run_analysis(req)
+end
+
+W->>F: run(sku/matrix/test/url)
+F->>Z: 下载或读取 logsarchive.zip
+Z-->>F: zip bytes
+F-->>W: raw_log
+
+W->>P: parse(raw_log)
+P-->>W: errors/warnings/highlights/tokens
+
+W->>C: plan(query + parsed)
+C-->>W: selected_tools
+
+par 并行专家调用
+  W->>SP: run(query, context)
+  SP-->>W: spec evidences
+and
+  W->>TP: run(query, context)
+  TP-->>W: tp evidences
+and
+  W->>J: run(query, context)
+  J-->>W: jira evidences / fallback
+end
+
+W->>L: finalize(parsed + evidences + route_reason)
+L-->>W: final_summary
+
+alt UI_MODE=api
+  W-->>A: AnalyzeResponse
+  A-->>S: JSON / SSE events
+else UI_MODE=local
+  W-->>S: AnalyzeResponse + local timeline
+end
+S-->>U: 展示结论、证据、工具执行轨迹
 ```
 
 ---
@@ -45,6 +133,8 @@ R --> UI
 
 ```text
 jupiter/
+  jupiter_core/
+    workflow.py
   apps/
     backend/
       api/routes.py
@@ -177,6 +267,9 @@ uvicorn apps.backend.main:app --host 0.0.0.0 --port 8000
 
 5. 启动前端（新开一个终端，并再次激活同一个 `.venv`）
 
+默认 `JUPITER_UI_MODE=api`（前端通过 FastAPI 调用）。  
+如果你想本地直连核心工作流（调试时更快），把 `.env` 里改成 `JUPITER_UI_MODE=local`。
+
 ```bash
 streamlit run apps/frontend/streamlit_app.py --server.port 8502
 ```
@@ -210,6 +303,8 @@ streamlit run apps/frontend/streamlit_app.py --server.port 8502
 | `PIP_EXTRA_INDEX_URL` | 额外 Python 包源 | `https://extra.example.com/simple` |
 | `PIP_TRUSTED_HOST` | pip 信任主机（可多个，逗号分隔） | `pypi.org,files.pythonhosted.org,pypi.python.org` |
 | `CACHE_TTL_SECONDS` | 请求缓存秒数 | `600` |
+| `JUPITER_UI_MODE` | Streamlit 调用模式：`api` 或 `local` | `api` |
+| `JUPITER_BACKEND` | Streamlit 在 `api` 模式下的后端地址 | `http://backend:8000` |
 
 ---
 

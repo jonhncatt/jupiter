@@ -1,14 +1,24 @@
 import os
 import time
+import asyncio
+import queue
+import threading
 from typing import Any, Dict
 
 import requests
 import streamlit as st
 
+from apps.backend.core.models import AnalyzeRequest, AnalyzeResponse
+from apps.backend.services.cache import TTLCache
+from jupiter_core.workflow import run_analysis
+
 BACKEND = os.getenv("JUPITER_BACKEND", "http://backend:8000")
+UI_MODE = os.getenv("JUPITER_UI_MODE", "api").strip().lower()
+_LOCAL_CACHE = TTLCache(ttl_seconds=600)
 
 st.set_page_config(page_title="Jupiter", layout="wide")
 st.title("Jupiter - Multi-Agent Log Analysis")
+st.caption(f"UI mode: `{UI_MODE}`")
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -68,6 +78,51 @@ def event_to_line(evt: Dict[str, Any]) -> str:
     return f"[{seq}] {typ:<16} target={target:<20} status={status:<8} {info}"
 
 
+def run_async(coro):
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+
+    result_queue: queue.Queue[tuple[bool, Any]] = queue.Queue(maxsize=1)
+
+    def _runner() -> None:
+        try:
+            result_queue.put((True, asyncio.run(coro)))
+        except Exception as e:
+            result_queue.put((False, e))
+
+    t = threading.Thread(target=_runner, daemon=True)
+    t.start()
+    t.join()
+    ok, payload = result_queue.get()
+    if ok:
+        return payload
+    raise payload
+
+
+def run_local(payload: Dict[str, Any], timeline_box) -> Dict[str, Any]:
+    req = AnalyzeRequest(**payload)
+    events: list[Dict[str, Any]] = []
+    event_lines: list[str] = []
+
+    def _collector(evt: Dict[str, Any]) -> None:
+        events.append(evt)
+        event_lines.append(event_to_line({"seq": len(events), **evt}))
+        timeline_box.code("\n".join(event_lines[-120:]))
+
+    result: AnalyzeResponse = run_async(
+        run_analysis(
+            req,
+            use_cache=False,
+            run_id="local-ui",
+            event_callback=_collector,
+            cache=_LOCAL_CACHE,
+        )
+    )
+    return result.model_dump(mode="json")
+
+
 if st.button("分析"):
     payload = {
         "request_id": "req-streamlit-001",
@@ -79,7 +134,18 @@ if st.button("分析"):
         "context": {},
     }
 
-    if use_run_api:
+    if UI_MODE == "local":
+        if use_run_api:
+            st.info("当前为 local 模式：直接调用 jupiter_core，不经过 /api/runs。")
+        timeline_box = st.empty()
+        timeline_box.code("local workflow running...")
+        try:
+            data = run_local(payload, timeline_box)
+        except Exception as e:
+            st.error(f"本地模式运行失败: {e}")
+            st.stop()
+        render_result(data)
+    elif use_run_api:
         try:
             r = requests.post(f"{BACKEND}/api/runs", json=payload, timeout=30)
             r.raise_for_status()
