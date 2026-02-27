@@ -14,6 +14,8 @@ class GraphState(TypedDict, total=False):
 
     raw_log: str
     fetch_meta: Dict[str, Any]
+    intent: Dict[str, Any]
+    validation: Dict[str, Any]
     parsed: Dict[str, Any]
     core_plan: Dict[str, Any]
 

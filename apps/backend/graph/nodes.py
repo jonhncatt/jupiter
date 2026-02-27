@@ -3,7 +3,9 @@ import inspect
 import time
 from apps.backend.graph.state import GraphState
 from apps.backend.services.log_parser import LogParser
+from apps.backend.services.input_validator import InputValidator
 from apps.backend.agents.fetch_agent import FetchAgent
+from apps.backend.agents.intent_parser_agent import IntentParserAgent
 from apps.backend.agents.core_agent import CoreAgent
 from apps.backend.agents.spec_agent import SpecAgent
 from apps.backend.agents.tp_agent import TpAgent
@@ -33,12 +35,109 @@ async def _emit_event(state: GraphState, event_type: str, payload: dict) -> None
 
 def make_nodes(
     fetch_agent: FetchAgent,
+    intent_parser: IntentParserAgent,
+    validator: InputValidator,
     parser: LogParser,
     core: CoreAgent,
     spec: SpecAgent,
     tp: TpAgent,
     jira: JiraAgent,
 ):
+    async def node_intent(state: GraphState) -> GraphState:
+        t0 = time.perf_counter()
+        await _emit_event(
+            state,
+            "node.started",
+            {"node": "intent", "run_id": state.get("run_id")},
+        )
+        intent = await intent_parser.run(
+            user_query=state.get("user_query", ""),
+            sku=state.get("sku"),
+            matrix_id=state.get("matrix_id"),
+            test_id=state.get("test_id"),
+            zeus_test_url=state.get("zeus_test_url"),
+        )
+        trace = _append_trace(
+            state,
+            {
+                "node": "intent",
+                "duration_ms": round((time.perf_counter() - t0) * 1000, 2),
+                "source": intent.get("source"),
+                "sku": intent.get("sku"),
+                "matrix_id": intent.get("matrix_id"),
+                "test_id": intent.get("test_id"),
+                "zeus_test_url": intent.get("zeus_test_url"),
+            },
+        )
+        await _emit_event(
+            state,
+            "node.finished",
+            {
+                "node": "intent",
+                "run_id": state.get("run_id"),
+                "duration_ms": trace[-1]["duration_ms"],
+                "source": trace[-1]["source"],
+                "sku": trace[-1]["sku"],
+                "matrix_id": trace[-1]["matrix_id"],
+                "test_id": trace[-1]["test_id"],
+                "zeus_test_url": trace[-1]["zeus_test_url"],
+            },
+        )
+        return {**state, "intent": intent, "debug_trace": trace}
+
+    async def node_validate(state: GraphState) -> GraphState:
+        t0 = time.perf_counter()
+        await _emit_event(
+            state,
+            "node.started",
+            {"node": "validate", "run_id": state.get("run_id")},
+        )
+        validation = validator.validate(
+            state.get("intent", {}),
+            {
+                "sku": state.get("sku"),
+                "matrix_id": state.get("matrix_id"),
+                "test_id": state.get("test_id"),
+                "zeus_test_url": state.get("zeus_test_url"),
+                "user_query": state.get("user_query"),
+            },
+        )
+        resolved = validation.get("resolved", {})
+        trace = _append_trace(
+            state,
+            {
+                "node": "validate",
+                "duration_ms": round((time.perf_counter() - t0) * 1000, 2),
+                "valid": validation.get("valid"),
+                "errors": validation.get("errors", []),
+                "warnings": validation.get("warnings", []),
+                "resolved": resolved,
+            },
+        )
+        await _emit_event(
+            state,
+            "node.finished",
+            {
+                "node": "validate",
+                "run_id": state.get("run_id"),
+                "duration_ms": trace[-1]["duration_ms"],
+                "valid": validation.get("valid"),
+                "errors": validation.get("errors", []),
+                "warnings": validation.get("warnings", []),
+                "resolved": resolved,
+            },
+        )
+        return {
+            **state,
+            "validation": validation,
+            "sku": resolved.get("sku", state.get("sku")),
+            "matrix_id": resolved.get("matrix_id", state.get("matrix_id")),
+            "test_id": resolved.get("test_id", state.get("test_id")),
+            "zeus_test_url": resolved.get("zeus_test_url", state.get("zeus_test_url")),
+            "user_query": resolved.get("user_query", state.get("user_query")),
+            "debug_trace": trace,
+        }
+
     async def node_fetch(state: GraphState) -> GraphState:
         t0 = time.perf_counter()
         await _emit_event(
@@ -286,4 +385,4 @@ def make_nodes(
         )
         return {**state, "final_summary": final_summary, "draft_summary": final_summary, "debug_trace": trace}
 
-    return node_fetch, node_parse, node_core_plan, node_experts, node_finalize
+    return node_intent, node_validate, node_fetch, node_parse, node_core_plan, node_experts, node_finalize

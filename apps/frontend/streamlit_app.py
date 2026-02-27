@@ -127,6 +127,10 @@ def render_result(data: Dict[str, Any]) -> None:
 
     if show_debug_detail:
         st.subheader("步骤细节（Debug）")
+        with st.expander("Intent 解析", expanded=False):
+            st.json(raw.get("intent", {}))
+        with st.expander("参数校验", expanded=False):
+            st.json(raw.get("validation", {}))
         with st.expander("Core 路由决策", expanded=False):
             st.json(raw.get("core_plan", {}))
         with st.expander("Parser 输出", expanded=False):

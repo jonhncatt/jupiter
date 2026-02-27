@@ -21,6 +21,8 @@ UI["Streamlit"] --> CORE["jupiter_core.run_analysis"]
 API["FastAPI /api/analyze"] --> CORE
 CORE --> G["LangGraph Workflow"]
 
+G --> I["IntentParser(LLM)"]
+G --> V["InputValidator"]
 G --> F["FetchAgent"]
 F --> Z["ZeusPortalClient"]
 G --> P["LogParser"]
@@ -54,13 +56,16 @@ FE --> API
 API --> WF["jupiter_core.run_analysis"]
 FELOCAL --> WF
 
+WF --> INTENT["IntentParserAgent(LLM解析自然语言参数)"]
+WF --> VALIDATE["InputValidator(参数校验)"]
 WF --> FETCH["FetchAgent + LogFetcher"]
 FETCH --> ZEUS["ZeusPortalClient / 本地路径读取zip"]
 WF --> PARSE["LogParser"]
 WF --> COREPLAN["CoreAgent.plan (路由决策)"]
-COREPLAN --> SPEC["SpecAgent -> Dify Spec App"]
-COREPLAN --> TP["TpAgent -> Dify TP App"]
-COREPLAN --> JIRA["JiraAgent -> Dify Jira App"]
+WF --> EXP["ExpertsOrchestrator"]
+EXP --> SPEC["6-1 Spec Expert Agent -> Dify Spec App"]
+EXP --> TP["6-2 TP Expert Agent -> Dify TP App"]
+EXP --> JIRA["6-3 Jira Expert Agent -> Dify Jira App"]
 SPEC --> DIFY["Dify /v1/chat-messages"]
 TP --> DIFY
 JIRA --> DIFY
@@ -76,6 +81,8 @@ participant U as User
 participant S as Streamlit
 participant A as FastAPI
 participant W as jupiter_core.run_analysis
+participant I as IntentParser(LLM)
+participant V as InputValidator
 participant F as FetchAgent/LogFetcher
 participant Z as Zeus(or local zip)
 participant P as LogParser
@@ -92,6 +99,11 @@ alt UI_MODE=api
 else UI_MODE=local
   S->>W: run_analysis(req)
 end
+
+W->>I: parse intent(query + optional ids/url)
+I-->>W: resolved params + confidence
+W->>V: validate/sanitize params
+V-->>W: validated inputs/errors/warnings
 
 W->>F: run(sku/matrix/test/url)
 F->>Z: 下载或读取 logsarchive.zip
@@ -142,6 +154,7 @@ jupiter/
       agents/
         core_agent.py
         fetch_agent.py
+        intent_parser_agent.py
         spec_agent.py
         tp_agent.py
         jira_agent.py
@@ -149,6 +162,7 @@ jupiter/
         zeus_portal.py
         dify_client.py
       services/
+        input_validator.py
         log_fetcher.py
         log_parser.py
       core/
@@ -373,12 +387,22 @@ ZEUS_COOKIE=...
 
 ## 9. 运行流程（一次请求）
 
-1. `FetchAgent` 下载并合并日志文本（失败时自动使用 mock log）。  
-2. `LogParser` 产出 `errors/warnings/highlights/tokens`。  
-3. `CoreAgent.plan` 决定调用哪些专家（Spec/TP/Jira）与检索轮次提示。  
-4. 专家并行调用各自 Dify App，返回证据片段。  
-5. `CoreAgent.finalize` 汇总日志线索 + 专家证据，生成最终中文报告。  
-6. API 返回 `AnalyzeResponse`（摘要、根因、证据、建议、下一步）。  
+1. `IntentParserAgent(LLM)`：从自然语言解析 `sku/matrix_id/test_id/zeus_test_url`。  
+2. `InputValidator`：参数校验（必填、模板占位、格式），输出 `errors/warnings/resolved`。  
+3. `FetchAgent`：按校验后的参数下载或读取日志 zip（失败时自动 fallback mock，并记录 reason）。  
+4. `LogParser`：提取 `errors/warnings/highlights/tokens`。  
+5. `CoreAgent.plan`：决定专家路由与轮次提示。  
+6. `ExpertsOrchestrator`：并行调用专家：  
+   - `6-1 Spec Expert Agent`（Dify Spec App）  
+   - `6-2 TP Expert Agent`（Dify TP App）  
+   - `6-3 Jira Expert Agent`（Dify Jira App）  
+7. `CoreAgent.finalize(LLM)`：聚合日志证据 + 专家证据，输出中文结构化结论。  
+8. API 返回 `AnalyzeResponse`（摘要、根因、证据、建议、下一步）。  
+
+### 9.1 哪些节点是 LLM 驱动
+
+- LLM 驱动：`IntentParserAgent`、`CoreAgent.finalize`、各 Expert 调用的 Dify（Dify 内部一般为检索+LLM）。  
+- 非 LLM（确定性工具/规则）：`InputValidator`、`FetchAgent`、`LogParser`、`CoreAgent.plan`（当前实现）。  
 
 ---
 

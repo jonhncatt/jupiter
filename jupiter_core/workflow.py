@@ -4,6 +4,7 @@ from typing import Any, Awaitable, Callable, Dict, Optional
 
 from apps.backend.agents.core_agent import CoreAgent
 from apps.backend.agents.fetch_agent import FetchAgent
+from apps.backend.agents.intent_parser_agent import IntentParserAgent
 from apps.backend.agents.jira_agent import JiraAgent
 from apps.backend.agents.spec_agent import SpecAgent
 from apps.backend.agents.tp_agent import TpAgent
@@ -12,6 +13,7 @@ from apps.backend.core.models import AnalyzeRequest, AnalyzeResponse, Evidence
 from apps.backend.graph.build_graph import build
 from apps.backend.graph.nodes import make_nodes
 from apps.backend.services.cache import TTLCache
+from apps.backend.services.input_validator import InputValidator
 from apps.backend.services.log_fetcher import LogFetcher
 from apps.backend.services.log_parser import LogParser
 from apps.backend.tools.dify_client import DifyClient
@@ -63,6 +65,8 @@ async def run_analysis(
 
     zeus = ZeusPortalClient()
     fetch_agent = FetchAgent(LogFetcher(zeus))
+    intent_parser = IntentParserAgent()
+    validator = InputValidator()
     parser = LogParser()
 
     spec_client = DifyClient(settings.dify_spec_app_key)
@@ -74,10 +78,10 @@ async def run_analysis(
     jira_agent = JiraAgent(jira_client)
     core_agent = CoreAgent()
 
-    node_fetch, node_parse, node_core_plan, node_experts, node_finalize = make_nodes(
-        fetch_agent, parser, core_agent, spec_agent, tp_agent, jira_agent
+    node_intent, node_validate, node_fetch, node_parse, node_core_plan, node_experts, node_finalize = make_nodes(
+        fetch_agent, intent_parser, validator, parser, core_agent, spec_agent, tp_agent, jira_agent
     )
-    graph = build(node_fetch, node_parse, node_core_plan, node_experts, node_finalize)
+    graph = build(node_intent, node_validate, node_fetch, node_parse, node_core_plan, node_experts, node_finalize)
 
     init = {
         "run_id": run_id,

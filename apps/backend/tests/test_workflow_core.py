@@ -9,6 +9,7 @@ pytestmark = pytest.mark.asyncio
 
 async def test_run_analysis_shared_core(monkeypatch):
     from apps.backend.agents.core_agent import CoreAgent
+    from apps.backend.agents.intent_parser_agent import IntentParserAgent
     from apps.backend.agents.spec_agent import SpecAgent
     from apps.backend.agents.tp_agent import TpAgent
 
@@ -31,10 +32,23 @@ async def test_run_analysis_shared_core(monkeypatch):
     async def fake_finalize(self, *, query, parsed, core_plan, expert_reports):
         return "总结：mock\n根因：mock\n建议：mock"
 
+    async def fake_intent(self, **kwargs):
+        return {
+            "sku": None,
+            "matrix_id": None,
+            "test_id": None,
+            "zeus_test_url": None,
+            "normalized_query": kwargs.get("user_query"),
+            "source": "test",
+            "confidence": 1.0,
+            "notes": "test",
+        }
+
     monkeypatch.setattr(SpecAgent, "run", fake_spec_tp)
     monkeypatch.setattr(TpAgent, "run", fake_spec_tp)
     monkeypatch.setattr(CoreAgent, "plan", fake_plan)
     monkeypatch.setattr(CoreAgent, "finalize", fake_finalize)
+    monkeypatch.setattr(IntentParserAgent, "run", fake_intent)
 
     resp = await run_analysis(
         AnalyzeRequest(request_id="r1", user_query="why failed"),
