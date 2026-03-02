@@ -8,6 +8,7 @@ from apps.backend.services.input_validator import InputValidator
 from apps.backend.agents.fetch_agent import FetchAgent
 from apps.backend.agents.intent_parser_agent import IntentParserAgent
 from apps.backend.agents.core_agent import CoreAgent
+from apps.backend.agents.evidence_judge import EvidenceJudge
 from apps.backend.agents.spec_agent import SpecAgent
 from apps.backend.agents.tp_agent import TpAgent
 from apps.backend.agents.jira_agent import JiraAgent
@@ -40,6 +41,7 @@ def make_nodes(
     validator: InputValidator,
     parser: LogParser,
     core: CoreAgent,
+    judge: EvidenceJudge,
     spec: SpecAgent,
     tp: TpAgent,
     jira: JiraAgent,
@@ -296,7 +298,17 @@ def make_nodes(
                 "reason": trace[-1]["reason"],
             },
         )
-        return {**state, "core_plan": plan, "debug_trace": trace}
+        return {
+            **state,
+            "core_plan": plan,
+            "expert_cycle": {
+                "selected_tools": list(plan.get("selected_tools", []) or []),
+                "expert_queries": dict(plan.get("expert_queries", {}) or {}),
+            },
+            "retry_count": 0,
+            "max_retry_count": state.get("max_retry_count", 1) or 1,
+            "debug_trace": trace,
+        }
 
     async def node_experts(state: GraphState) -> GraphState:
         t0 = time.perf_counter()
@@ -306,8 +318,9 @@ def make_nodes(
             {"node": "experts", "run_id": state.get("run_id"), "status": "started"},
         )
         plan = state.get("core_plan", {})
-        selected = plan.get("selected_tools", []) or []
-        expert_queries = plan.get("expert_queries", {}) or {}
+        cycle = state.get("expert_cycle", {}) or {}
+        selected = cycle.get("selected_tools", plan.get("selected_tools", [])) or []
+        expert_queries = cycle.get("expert_queries", plan.get("expert_queries", {})) or {}
 
         ctx = {
             "original_query": state["user_query"],
@@ -365,10 +378,10 @@ def make_nodes(
 
         results = await asyncio.gather(*tasks, return_exceptions=True) if tasks else []
 
-        tool_results = []
+        round_results = []
         for name, result in zip(task_names, results):
             if isinstance(result, Exception):
-                tool_results.append(ToolResult(tool=f"{name}_agent", ok=False, summary=str(result), evidences=[]))
+                round_results.append(ToolResult(tool=f"{name}_agent", ok=False, summary=str(result), evidences=[]))
                 await _emit_event(
                     state,
                     "agent.finished",
@@ -380,7 +393,7 @@ def make_nodes(
                     },
                 )
             else:
-                tool_results.append(result)
+                round_results.append(result)
                 await _emit_event(
                     state,
                     "agent.finished",
@@ -393,7 +406,7 @@ def make_nodes(
                 )
 
         if not selected:
-            tool_results.append(
+            round_results.append(
                 ToolResult(
                     tool=core.name,
                     ok=True,
@@ -403,6 +416,8 @@ def make_nodes(
                 )
             )
 
+        tool_results = _merge_tool_results(state.get("tool_results", []), round_results)
+
         trace = _append_trace(
             state,
             {
@@ -410,7 +425,8 @@ def make_nodes(
                 "duration_ms": round((time.perf_counter() - t0) * 1000, 2),
                 "selected_tools": selected,
                 "expert_queries": expert_queries,
-                "results": [{"tool": r.tool, "ok": r.ok, "summary": r.summary} for r in tool_results],
+                "results": [{"tool": r.tool, "ok": r.ok, "summary": r.summary} for r in round_results],
+                "retry_count": state.get("retry_count", 0),
             },
         )
         await _emit_event(
@@ -424,9 +440,103 @@ def make_nodes(
                 "selected_tools": trace[-1]["selected_tools"],
                 "expert_queries": trace[-1]["expert_queries"],
                 "results": trace[-1]["results"],
+                "retry_count": trace[-1]["retry_count"],
             },
         )
-        return {**state, "tool_results": tool_results, "debug_trace": trace}
+        return {
+            **state,
+            "tool_results": tool_results,
+            "latest_tool_results": round_results,
+            "debug_trace": trace,
+        }
+
+    async def node_evidence_judge(state: GraphState) -> GraphState:
+        t0 = time.perf_counter()
+        await _emit_event(
+            state,
+            "node.started",
+            {"node": "evidence_judge", "run_id": state.get("run_id"), "status": "started"},
+        )
+        cycle = state.get("expert_cycle", {}) or {}
+        judge_result = judge.evaluate(
+            selected_tools=list(cycle.get("selected_tools", []) or []),
+            latest_tool_results=list(state.get("latest_tool_results", []) or []),
+            prior_queries=dict(cycle.get("expert_queries", {}) or {}),
+            retry_count=int(state.get("retry_count", 0) or 0),
+            max_retry_count=int(state.get("max_retry_count", 1) or 1),
+        )
+        trace = _append_trace(
+            state,
+            {
+                "node": "evidence_judge",
+                "duration_ms": round((time.perf_counter() - t0) * 1000, 2),
+                "enough": judge_result.get("enough", False),
+                "retry_tools": judge_result.get("retry_tools", []),
+                "reason": judge_result.get("reason", ""),
+            },
+        )
+        await _emit_event(
+            state,
+            "node.finished",
+            {
+                "node": "evidence_judge",
+                "run_id": state.get("run_id"),
+                "status": "ok" if judge_result.get("enough") else "warn",
+                "duration_ms": trace[-1]["duration_ms"],
+                "enough": trace[-1]["enough"],
+                "retry_tools": trace[-1]["retry_tools"],
+                "reason": trace[-1]["reason"],
+                "details": judge_result.get("details", []),
+            },
+        )
+        return {**state, "judge_result": judge_result, "debug_trace": trace}
+
+    async def node_retry_plan(state: GraphState) -> GraphState:
+        t0 = time.perf_counter()
+        await _emit_event(
+            state,
+            "node.started",
+            {"node": "retry_plan", "run_id": state.get("run_id"), "status": "started"},
+        )
+        cycle = dict(state.get("expert_cycle", {}) or {})
+        judge_result = state.get("judge_result", {}) or {}
+        retry_tools = list(judge_result.get("retry_tools", []) or [])
+        retry_queries = dict(judge_result.get("retry_queries", {}) or {})
+        next_cycle = {
+            "selected_tools": retry_tools,
+            "expert_queries": retry_queries,
+        }
+        next_retry_count = int(state.get("retry_count", 0) or 0) + 1
+        trace = _append_trace(
+            state,
+            {
+                "node": "retry_plan",
+                "duration_ms": round((time.perf_counter() - t0) * 1000, 2),
+                "retry_tools": retry_tools,
+                "retry_queries": retry_queries,
+                "retry_count": next_retry_count,
+                "previous_cycle": cycle,
+            },
+        )
+        await _emit_event(
+            state,
+            "node.finished",
+            {
+                "node": "retry_plan",
+                "run_id": state.get("run_id"),
+                "status": "ok" if retry_tools else "warn",
+                "duration_ms": trace[-1]["duration_ms"],
+                "retry_tools": retry_tools,
+                "retry_queries": retry_queries,
+                "retry_count": next_retry_count,
+            },
+        )
+        return {
+            **state,
+            "expert_cycle": next_cycle,
+            "retry_count": next_retry_count,
+            "debug_trace": trace,
+        }
 
     async def node_finalize(state: GraphState) -> GraphState:
         t0 = time.perf_counter()
@@ -463,4 +573,30 @@ def make_nodes(
         )
         return {**state, "final_summary": final_summary, "draft_summary": final_summary, "debug_trace": trace}
 
-    return node_intent, node_validate, node_fetch, node_parse, node_core_plan, node_experts, node_finalize
+    return (
+        node_intent,
+        node_validate,
+        node_fetch,
+        node_parse,
+        node_core_plan,
+        node_experts,
+        node_evidence_judge,
+        node_retry_plan,
+        node_finalize,
+    )
+
+
+def _merge_tool_results(existing: list[ToolResult], new_results: list[ToolResult]) -> list[ToolResult]:
+    merged = {item.tool: item for item in existing}
+    for item in new_results:
+        prev = merged.get(item.tool)
+        if prev is None:
+            merged[item.tool] = item
+            continue
+        prev_score = int((prev.debug or {}).get("evidence_score") or 0)
+        item_score = int((item.debug or {}).get("evidence_score") or 0)
+        if item.ok and (not prev.ok or item_score >= prev_score):
+            merged[item.tool] = item
+        elif not prev.ok and item_score > prev_score:
+            merged[item.tool] = item
+    return list(merged.values())

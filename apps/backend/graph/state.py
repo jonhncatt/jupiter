@@ -18,8 +18,13 @@ class GraphState(TypedDict, total=False):
     validation: Dict[str, Any]
     parsed: Dict[str, Any]
     core_plan: Dict[str, Any]
+    expert_cycle: Dict[str, Any]
 
     tool_results: List[ToolResult]
+    latest_tool_results: List[ToolResult]
+    judge_result: Dict[str, Any]
+    retry_count: int
+    max_retry_count: int
     debug_trace: List[Dict[str, Any]]
     final_summary: str
     draft_summary: str

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Awaitable, Callable, Dict, Optional
 
 from apps.backend.agents.core_agent import CoreAgent
+from apps.backend.agents.evidence_judge import EvidenceJudge
 from apps.backend.agents.fetch_agent import FetchAgent
 from apps.backend.agents.intent_parser_agent import IntentParserAgent
 from apps.backend.agents.jira_agent import JiraAgent
@@ -93,11 +94,32 @@ async def run_analysis(
     tp_agent = TpAgent(tp_client)
     jira_agent = JiraAgent(jira_client)
     core_agent = CoreAgent()
+    evidence_judge = EvidenceJudge()
 
-    node_intent, node_validate, node_fetch, node_parse, node_core_plan, node_experts, node_finalize = make_nodes(
-        fetch_agent, intent_parser, validator, parser, core_agent, spec_agent, tp_agent, jira_agent
+    (
+        node_intent,
+        node_validate,
+        node_fetch,
+        node_parse,
+        node_core_plan,
+        node_experts,
+        node_evidence_judge,
+        node_retry_plan,
+        node_finalize,
+    ) = make_nodes(
+        fetch_agent, intent_parser, validator, parser, core_agent, evidence_judge, spec_agent, tp_agent, jira_agent
     )
-    graph = build(node_intent, node_validate, node_fetch, node_parse, node_core_plan, node_experts, node_finalize)
+    graph = build(
+        node_intent,
+        node_validate,
+        node_fetch,
+        node_parse,
+        node_core_plan,
+        node_experts,
+        node_evidence_judge,
+        node_retry_plan,
+        node_finalize,
+    )
 
     init = {
         "run_id": run_id,

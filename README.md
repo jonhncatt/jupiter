@@ -31,6 +31,8 @@ G --> C1["CoreAgent.plan"]
 C1 --> S["SpecAgent (Dify App)"]
 C1 --> T["TpAgent (Dify App)"]
 C1 --> J["JiraAgent (Dify App)"]
+G --> EJ["EvidenceJudge"]
+G --> RP["RetryPlan"]
 
 S --> D["Dify /v1/chat-messages"]
 T --> D
@@ -66,6 +68,8 @@ WF --> EXP["ExpertsOrchestrator"]
 EXP --> SPEC["6-1 Spec Expert Agent -> Dify Spec App"]
 EXP --> TP["6-2 TP Expert Agent -> Dify TP App"]
 EXP --> JIRA["6-3 Jira Expert Agent -> Dify Jira App"]
+WF --> JUDGE["EvidenceJudge(证据充分性判断)"]
+WF --> RETRY["RetryPlan(改写 expert query 后重试)"]
 SPEC --> DIFY["Dify /v1/chat-messages"]
 TP --> DIFY
 JIRA --> DIFY
@@ -90,6 +94,8 @@ participant C as CoreAgent.plan
 participant SP as SpecAgent(Dify)
 participant TP as TpAgent(Dify)
 participant J as JiraAgent(Dify)
+participant EJ as EvidenceJudge
+participant RP as RetryPlan
 participant L as CoreAgent.finalize+LLM
 
 U->>S: 点击「分析」
@@ -125,6 +131,16 @@ and
 and
   W->>J: run(query, context)
   J-->>W: jira evidences / fallback
+end
+
+W->>EJ: judge(latest expert evidences)
+alt 证据不足且未超过重试上限
+  EJ-->>W: retry_tools + retry_queries
+  W->>RP: build retry cycle
+  RP-->>W: rewritten expert queries
+  W->>SP: rerun selected expert(s)
+else 证据足够
+  EJ-->>W: enough=true
 end
 
 W->>L: finalize(parsed + evidences + route_reason)
@@ -403,8 +419,10 @@ ZEUS_COOKIE=...
    - `6-2 TP Expert Agent`（Dify TP App）  
    - `6-3 Jira Expert Agent`（Dify Jira App）  
    - 每个 Expert 都先做 retrieval-first 多查询检索，再根据证据充分性挑选最佳结果返回给 Core。  
-7. `CoreAgent.finalize(LLM)`：聚合日志证据 + 专家证据，输出中文结构化结论。  
-8. API 返回 `AnalyzeResponse`（摘要、根因、证据、建议、下一步）。  
+7. `EvidenceJudge`：判断当前 expert 证据是否足够；若不足则挑出需要重试的 expert。  
+8. `RetryPlan`：改写对应 expert query，并只重跑证据不足的 expert。  
+9. `CoreAgent.finalize(LLM)`：聚合日志证据 + 专家证据，输出中文结构化结论。  
+10. API 返回 `AnalyzeResponse`（摘要、根因、证据、建议、下一步）。  
 
 ### 9.1 哪些节点是 LLM 驱动
 

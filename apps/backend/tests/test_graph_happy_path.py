@@ -8,6 +8,7 @@ async def test_graph_runs(monkeypatch):
     from apps.backend.agents.spec_agent import SpecAgent
     from apps.backend.agents.tp_agent import TpAgent
     from apps.backend.agents.core_agent import CoreAgent
+    from apps.backend.agents.evidence_judge import EvidenceJudge
     from apps.backend.agents.intent_parser_agent import IntentParserAgent
     from apps.backend.agents.fetch_agent import FetchAgent
     from apps.backend.core.models import ToolResult, Evidence
@@ -16,7 +17,13 @@ async def test_graph_runs(monkeypatch):
 
     async def fake_run(self, q, ctx):
         seen_queries[self.name] = q
-        return ToolResult(tool=self.name, ok=True, summary="fake", evidences=[Evidence(source="fake", snippet="s", meta={})])
+        return ToolResult(
+            tool=self.name,
+            ok=True,
+            summary="fake",
+            evidences=[Evidence(source="fake", snippet="JIRA-1 /src/main.cpp function_x", meta={})],
+            debug={"evidence_score": 8, "rounds": [{"citations_count": 1}]},
+        )
 
     async def fake_core(self, q, parsed, raw_log=""):
         return {
@@ -87,15 +94,36 @@ async def test_graph_runs(monkeypatch):
     validator = InputValidator()
     parser = LogParser()
     core = CoreAgent()
+    judge = EvidenceJudge()
 
     spec = SpecAgent(DifyClient("k"))
     tp = TpAgent(DifyClient("k"))
     jira = JiraAgent()
 
-    node_intent, node_validate, node_fetch, node_parse, node_core_plan, node_experts, node_finalize = make_nodes(
-        fetch_agent, intent_parser, validator, parser, core, spec, tp, jira
+    (
+        node_intent,
+        node_validate,
+        node_fetch,
+        node_parse,
+        node_core_plan,
+        node_experts,
+        node_evidence_judge,
+        node_retry_plan,
+        node_finalize,
+    ) = make_nodes(
+        fetch_agent, intent_parser, validator, parser, core, judge, spec, tp, jira
     )
-    g = build(node_intent, node_validate, node_fetch, node_parse, node_core_plan, node_experts, node_finalize)
+    g = build(
+        node_intent,
+        node_validate,
+        node_fetch,
+        node_parse,
+        node_core_plan,
+        node_experts,
+        node_evidence_judge,
+        node_retry_plan,
+        node_finalize,
+    )
     out = await g.ainvoke({"request_id": "x", "user_query": "why", "matrix_id": None, "test_id": None, "zeus_test_url": None})
     assert "draft_summary" in out
     assert "final_summary" in out

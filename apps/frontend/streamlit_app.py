@@ -192,6 +192,15 @@ def render_result(data: Dict[str, Any]) -> None:
             st.json(raw.get("core_plan", {}))
         with st.expander("Core 给 Expert 的任务", expanded=False):
             st.json((raw.get("core_plan") or {}).get("expert_queries", {}))
+        with st.expander("Judge / Retry", expanded=False):
+            st.json(
+                {
+                    "judge_result": raw.get("judge_result", {}),
+                    "retry_count": raw.get("retry_count"),
+                    "max_retry_count": raw.get("max_retry_count"),
+                    "expert_cycle": raw.get("expert_cycle", {}),
+                }
+            )
         with st.expander("Parser 输出", expanded=False):
             parsed = raw.get("parsed", {})
             st.write(f"- errors: {len(parsed.get('errors', []))}")
