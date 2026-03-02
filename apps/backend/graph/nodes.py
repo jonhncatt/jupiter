@@ -310,10 +310,12 @@ def make_nodes(
         expert_queries = plan.get("expert_queries", {}) or {}
 
         ctx = {
+            "original_query": state["user_query"],
             "tokens": state["parsed"]["tokens"],
             "highlights": state["parsed"]["highlights"],
             "domain_context": state["parsed"].get("domain_context", {}),
             "round_hint": plan.get("round_hint", 1),
+            "core_plan": plan,
             "event_callback": state.get("event_callback"),
             "run_id": state.get("run_id"),
         }

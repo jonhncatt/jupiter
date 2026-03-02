@@ -402,13 +402,14 @@ ZEUS_COOKIE=...
    - `6-1 Spec Expert Agent`（Dify Spec App）  
    - `6-2 TP Expert Agent`（Dify TP App）  
    - `6-3 Jira Expert Agent`（Dify Jira App）  
+   - 每个 Expert 都先做 retrieval-first 多查询检索，再根据证据充分性挑选最佳结果返回给 Core。  
 7. `CoreAgent.finalize(LLM)`：聚合日志证据 + 专家证据，输出中文结构化结论。  
 8. API 返回 `AnalyzeResponse`（摘要、根因、证据、建议、下一步）。  
 
 ### 9.1 哪些节点是 LLM 驱动
 
-- LLM 驱动：`IntentParserAgent`、`CoreAgent.finalize`、各 Expert 调用的 Dify（Dify 内部一般为检索+LLM）。  
-- 非 LLM（确定性工具/规则）：`InputValidator`、`FetchAgent`、`LogParser`、`CoreAgent.plan`（当前实现）。  
+- LLM 驱动：`IntentParserAgent`、`CoreAgent.plan`（LLM planner + 规则兜底）、`CoreAgent.finalize`、各 Expert 调用的 Dify（Dify 内部一般为检索+LLM）。  
+- 非 LLM（确定性工具/规则）：`InputValidator`、`FetchAgent`、`LogParser`。  
 
 ### 9.2 当前内置的日志解析规则
 
