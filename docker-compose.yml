@@ -22,7 +22,7 @@ services:
         - PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL:-}
         - PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST:-}
     environment:
-      - JUPITER_BACKEND=http://backend:8000
+      - SEQUOIA_BACKEND=http://backend:8000
     ports:
       - "8502:8501"
     depends_on:

@@ -46,7 +46,7 @@ class DifyClient:
     def chat_messages_url(self) -> str:
         return f"{self.base}/chat-messages"
 
-    async def ask(self, query: str, *, user: str = "jupiter", conversation_id: Optional[str] = None) -> Dict[str, Any]:
+    async def ask(self, query: str, *, user: str = "sequoia", conversation_id: Optional[str] = None) -> Dict[str, Any]:
         if not self.base or not self.api_key:
             raise DifyError("Dify base url or api key not configured")
 

@@ -13,14 +13,14 @@ from dotenv import load_dotenv
 
 from apps.backend.core.models import AnalyzeRequest, AnalyzeResponse
 from apps.backend.services.cache import TTLCache
-from jupiter_core.workflow import run_analysis
+from sequoia_core.workflow import run_analysis
 
 # Load project .env for local runs (docker env vars still take precedence).
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(PROJECT_ROOT / ".env", override=False)
 
-BACKEND = os.getenv("JUPITER_BACKEND", "http://127.0.0.1:8000")
-UI_MODE = os.getenv("JUPITER_UI_MODE", "api").strip().lower()
+BACKEND = os.getenv("SEQUOIA_BACKEND", os.getenv("JUPITER_BACKEND", "http://127.0.0.1:8000"))
+UI_MODE = os.getenv("SEQUOIA_UI_MODE", os.getenv("JUPITER_UI_MODE", "api")).strip().lower()
 _LOCAL_CACHE = TTLCache(ttl_seconds=600)
 
 
@@ -51,8 +51,8 @@ def api_request_json(method: str, path: str, *, payload: Dict[str, Any] | None =
             errs.append(f"{base}: {e}")
     raise RuntimeError(" ; ".join(errs))
 
-st.set_page_config(page_title="Jupiter", layout="wide")
-st.title("Jupiter - Multi-Agent Log Analysis")
+st.set_page_config(page_title="Sequoia", layout="wide")
+st.title("Sequoia - Multi-Agent Log Analysis")
 st.caption(f"UI mode: `{UI_MODE}` | backend candidates: `{', '.join(BACKEND_CANDIDATES)}`")
 
 col1, col2, col3 = st.columns(3)
@@ -309,7 +309,7 @@ if st.button("分析"):
 
     if UI_MODE == "local":
         if use_run_api:
-            st.info("当前为 local 模式：直接调用 jupiter_core，不经过 /api/runs。")
+            st.info("当前为 local 模式：直接调用 sequoia_core，不经过 /api/runs。")
         timeline_box = st.empty()
         timeline_box.code("local workflow running...")
         try:

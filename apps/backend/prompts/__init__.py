@@ -1,1 +1,1 @@
-"""Shared prompt policies and soft rules for Jupiter agents."""
+"""Shared prompt policies and soft rules for Sequoia agents."""

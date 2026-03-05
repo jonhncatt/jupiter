@@ -218,7 +218,7 @@ def _read_local_zip_bytes_detail(path_or_url: str) -> tuple[bytes, dict]:
 
 
 def _save_debug_zip(zip_bytes: bytes) -> str:
-    base_dir = os.path.join(tempfile.gettempdir(), "jupiter_fetch")
+    base_dir = os.path.join(tempfile.gettempdir(), "sequoia_fetch")
     os.makedirs(base_dir, exist_ok=True)
     path = os.path.join(base_dir, f"{uuid.uuid4().hex}.zip")
     with open(path, "wb") as f:

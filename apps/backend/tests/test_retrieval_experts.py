@@ -10,7 +10,7 @@ class FakeClient:
         self.responses = list(responses)
         self.calls = []
 
-    async def ask(self, query: str, *, user: str = "jupiter", conversation_id=None):
+    async def ask(self, query: str, *, user: str = "sequoia", conversation_id=None):
         self.calls.append(query)
         if self.responses:
             return self.responses.pop(0)

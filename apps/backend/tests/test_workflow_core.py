@@ -2,7 +2,7 @@ import pytest
 
 from apps.backend.core.models import AnalyzeRequest, Evidence, ToolResult
 from apps.backend.services.cache import TTLCache
-from jupiter_core.workflow import run_analysis
+from sequoia_core.workflow import run_analysis
 
 pytestmark = pytest.mark.asyncio
 

@@ -5,5 +5,5 @@ from apps.backend.api.routes import router
 
 setup_logging()
 apply_tls_env()
-app = FastAPI(title="Jupiter Backend (Dify-RAG)", version="0.2.0")
+app = FastAPI(title="Sequoia Backend (Dify-RAG)", version="0.2.0")
 app.include_router(router, prefix="/api")

@@ -1,22 +1,26 @@
-class JupiterError(Exception):
+class SequoiaError(Exception):
     pass
 
 
-class ConfigError(JupiterError):
+class ConfigError(SequoiaError):
     pass
 
 
-class ZeusDownloadError(JupiterError):
+class ZeusDownloadError(SequoiaError):
     pass
 
 
-class DifyError(JupiterError):
+class DifyError(SequoiaError):
     pass
 
 
-class InputValidationError(JupiterError):
+class InputValidationError(SequoiaError):
     pass
 
 
-class LogFetchError(JupiterError):
+class LogFetchError(SequoiaError):
     pass
+
+
+# Backward compatibility for older imports.
+JupiterError = SequoiaError

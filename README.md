@@ -1,6 +1,6 @@
-# Jupiter（Zeus 日志 + Dify RAG + CoreAgent 编排）
+# Sequoia（Zeus 日志 + Dify RAG + CoreAgent 编排）
 
-Jupiter 是一个面向 SSD/NVMe 测试分析的后端系统：  
+Sequoia 是一个面向 SSD/NVMe 测试分析的后端系统：  
 输入 `sku/matrix_id/test_id + 用户问题`，自动获取 Zeus 日志、解析关键信号、按需调用 Dify 知识库（Spec/TP/Jira），最后输出结构化结论。
 
 ---
@@ -17,7 +17,7 @@ Jupiter 是一个面向 SSD/NVMe 测试分析的后端系统：
 
 ```mermaid
 flowchart LR
-UI["Streamlit"] --> CORE["jupiter_core.run_analysis"]
+UI["Streamlit"] --> CORE["sequoia_core.run_analysis"]
 API["FastAPI /api/analyze"] --> CORE
 CORE --> G["LangGraph Workflow"]
 
@@ -55,7 +55,7 @@ ENTRY -->|API 调用| API["FastAPI"]
 ENTRY -->|UI 模式=local| FELOCAL["Streamlit(local)"]
 
 FE --> API
-API --> WF["jupiter_core.run_analysis"]
+API --> WF["sequoia_core.run_analysis"]
 FELOCAL --> WF
 
 WF --> INTENT["IntentParserAgent(LLM解析自然语言参数)"]
@@ -84,7 +84,7 @@ sequenceDiagram
 participant U as User
 participant S as Streamlit
 participant A as FastAPI
-participant W as jupiter_core.run_analysis
+participant W as sequoia_core.run_analysis
 participant I as IntentParser(LLM)
 participant V as InputValidator
 participant F as FetchAgent/LogFetcher
@@ -160,8 +160,8 @@ S-->>U: 展示结论、证据、工具执行轨迹
 ## 3. 目录结构（关键部分）
 
 ```text
-jupiter/
-  jupiter_core/
+sequoia/
+  sequoia_core/
     workflow.py
   apps/
     backend/
@@ -306,9 +306,9 @@ uvicorn apps.backend.main:app --host 0.0.0.0 --port 8000
 
 5. 启动前端（新开一个终端，并再次激活同一个 `.venv`）
 
-默认 `JUPITER_UI_MODE=api`（前端通过 FastAPI 调用）。  
-如果你想本地直连核心工作流（调试时更快），把 `.env` 里改成 `JUPITER_UI_MODE=local`。
-本地 `api` 模式建议 `JUPITER_BACKEND=http://127.0.0.1:8000`；Docker 下保持 `http://backend:8000`。
+默认 `SEQUOIA_UI_MODE=api`（前端通过 FastAPI 调用）。  
+如果你想本地直连核心工作流（调试时更快），把 `.env` 里改成 `SEQUOIA_UI_MODE=local`。
+本地 `api` 模式建议 `SEQUOIA_BACKEND=http://127.0.0.1:8000`；Docker 下保持 `http://backend:8000`。
 
 ```bash
 streamlit run apps/frontend/streamlit_app.py --server.port 8502
@@ -357,8 +357,8 @@ Windows（不激活 venv 的直接启动方式）：
 | `PIP_EXTRA_INDEX_URL` | 额外 Python 包源 | `https://extra.example.com/simple` |
 | `PIP_TRUSTED_HOST` | pip 信任主机（可多个，逗号分隔） | `pypi.org,files.pythonhosted.org,pypi.python.org` |
 | `CACHE_TTL_SECONDS` | 请求缓存秒数 | `600` |
-| `JUPITER_UI_MODE` | Streamlit 调用模式：`api` 或 `local` | `api` |
-| `JUPITER_BACKEND` | Streamlit 在 `api` 模式下的后端地址（支持逗号分隔多地址，按顺序回退） | `http://127.0.0.1:8000,http://backend:8000` |
+| `SEQUOIA_UI_MODE` | Streamlit 调用模式：`api` 或 `local` | `api` |
+| `SEQUOIA_BACKEND` | Streamlit 在 `api` 模式下的后端地址（支持逗号分隔多地址，按顺序回退） | `http://127.0.0.1:8000,http://backend:8000` |
 
 ---
 
@@ -370,7 +370,7 @@ Windows（不激活 venv 的直接启动方式）：
 OFFICETOOL_CA_CERT_PATH=/absolute/path/to/CompanyInternalRootCA.cer
 ```
 
-Jupiter 会将该证书应用到以下请求：
+Sequoia 会将该证书应用到以下请求：
 
 - OpenAI-compatible LLM
 - Dify API
@@ -444,7 +444,7 @@ ZEUS_COOKIE=...
 ### 9.3 软规则（Prompt Skill）
 
 - `apps/backend/prompts/log_analysis_skill.py`
-- 这不是 Codex 平台的 `AGENTS.md`，而是 Jupiter 运行时自己的 prompt policy
+- 这不是 Codex 平台的 `AGENTS.md`，而是 Sequoia 运行时自己的 prompt policy
 - 作用：
   - 约束 `CoreAgent` 先分析，再按需给每个 expert 下发不同任务
   - 约束 `Spec/TP/Jira` 各自遵循固定分析习惯

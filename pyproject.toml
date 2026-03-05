@@ -1,7 +1,7 @@
 [project]
-name = "jupiter"
+name = "sequoia"
 version = "0.2.0"
-description = "Jupiter - Zeus log + Dify RAG + LangGraph"
+description = "Sequoia - Zeus log + Dify RAG + LangGraph"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.110.0",
@@ -22,7 +22,7 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = { find = { where = ["."], include = ["apps*", "jupiter_core*"] } }
+packages = { find = { where = ["."], include = ["apps*", "jupiter_core*", "sequoia_core*"] } }
 
 [tool.pytest.ini_options]
 testpaths = ["apps/backend/tests"]

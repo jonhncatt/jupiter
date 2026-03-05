@@ -40,7 +40,7 @@ def build_test_url(matrix_id: str, test_id: str, *, sku: Optional[str] = None) -
 
 def _headers() -> Dict[str, str]:
     headers: Dict[str, str] = {
-        "User-Agent": "Mozilla/5.0 JupiterBot",
+        "User-Agent": "Mozilla/5.0 SequoiaBot",
     }
     if settings.zeus_cookie:
         # 直接把浏览器复制的 Cookie header 全串填进 ZEUS_COOKIE
